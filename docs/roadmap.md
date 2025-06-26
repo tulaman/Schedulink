@@ -21,9 +21,9 @@ pnpm add -D typescript ts-node-dev jest ts-jest @types/jest
 ⸻
 
 Stage 1 «Hello, Telegram» — 0.5 day
-	•	Create bot via @BotFather; store TELEGRAM_BOT_TOKEN in .env
-	•	Minimal handler (src/telegram/bot.ts) – /ping → “pong”
-	•	Jest test – mock Telegraf, expect reply('pong')
+	•	Create bot via @BotFather; store TELEGRAM_BOT_TOKEN in .env [x]
+	•	Minimal handler (src/telegram/bot.ts) – /ping → “pong” [x]
+	•	Jest test – mock Telegraf, expect reply('pong') [x]
 
 :bulb: Outcome: you can send /ping and get a reply.
 
