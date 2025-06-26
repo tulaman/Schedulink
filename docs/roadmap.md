@@ -6,17 +6,15 @@ Stack: Node 20 LTS, TypeScript, pnpm, Prisma, Baileys, Telegraf, @openai/agents,
 ⸻
 
 Stage 0 «Bootstrap & CI» — 1 day
-	•	Create GitHub repository
-	•	Project init – pnpm init, commit tsconfig.json (target: es2022, module: es2022)
-	•	Install deps
+- [x] Create GitHub repository
+- [x] Project init – pnpm init, commit tsconfig.json (target: es2022, module: es2022)
+- [x] Install deps
 
 pnpm add telegraf baileys @openai/agents dotenv prisma @prisma/client
 pnpm add -D typescript ts-node-dev jest ts-jest @types/jest
-
-
-	•	Configure Jest – npx ts-jest config:init, set testEnvironment: "node"
-	•	CI pipeline – GitHub Actions: lint → test → build Docker image
-	•	Dockerisation – multistage Dockerfile + docker-compose.yml (api, mysql, redis)
+- [x] Configure Jest – npx ts-jest config:init, set testEnvironment: "node"
+- [x] CI pipeline – GitHub Actions: lint → test → build Docker image
+- [x] Dockerisation – multistage Dockerfile + docker-compose.yml (api, mysql, redis)
 
 :bulb: Outcome: container starts but does nothing yet.
 
