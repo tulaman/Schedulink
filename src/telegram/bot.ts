@@ -29,5 +29,24 @@ export function createBot() {
       await ctx.reply('QR not generated yet – please try again in a few seconds.');
     }
   });
+  bot.command('greet', async ctx => {
+    await fs.writeFile('telegram_chat_id', String(ctx.chat.id));
+    const parts = ctx.message.text.split(' ');
+    const jid = parts[1];
+    const name = parts.slice(2).join(' ');
+    if (jid && name) {
+      try {
+        const { generateGreeting } = await import('../agents/turkishNegotiator.js');
+        const greeting = await generateGreeting(name);
+        await sendWaMessage(jid, greeting);
+        await ctx.reply('sent');
+      } catch (err: any) {
+        console.error('Failed to generate greeting', err);
+        await ctx.reply('error');
+      }
+    } else {
+      await ctx.reply('Usage: /greet <jid> <name>');
+    }
+  });
   return bot;
 }

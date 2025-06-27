@@ -41,12 +41,12 @@ Stage 2 «WhatsApp login & echo» — 1 day
 ⸻
 
 Stage 3 «Simple LLM agent» — 1 day
-	•	Add OPENAI_API_KEY to .env
-	•	Agent skeleton (src/agents/turkishNegotiator.ts)
-	•	System prompt: “Native Turkish speaker …”
-	•	generateGreeting(name)
-	•	Command /greet – generate text & send to barber
-	•	Jest test – mock OpenAI endpoint, ensure prompt has name
+- [x] Add OPENAI_API_KEY to .env
+- [x] Agent skeleton (src/agents/turkishNegotiator.ts)
+- [x] System prompt: “Native Turkish speaker …”
+- [x] generateGreeting(name)
+- [x] Command /greet – generate text & send to barber
+- [x] Jest test – mock OpenAI endpoint, ensure prompt has name
 
 :bulb: Outcome: bot produces live Turkish greeting.
 
