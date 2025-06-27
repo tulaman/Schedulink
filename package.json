@@ -12,18 +12,18 @@
   },
   "dependencies": {
     "@openai/agents": "^0.0.1",
-    "@prisma/client": "^5.14.0",
-    "baileys": "^9.0.0",
+    "@prisma/client": "6.10.1",
+    "baileys": "6.7.18",
     "dotenv": "^16.0.0",
-    "prisma": "^5.14.0",
+    "prisma": "6.10.1",
     "telegraf": "^4.16.0"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.0",
-    "jest": "^29.7.0",
+    "@types/jest": "30.0.0",
+    "jest": "30.0.3",
     "ts-jest": "^29.1.0",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.0.0"
-  }
+  },
+  "packageManager": "pnpm@10.12.3+sha512.467df2c586056165580ad6dfb54ceaad94c5a30f80893ebdec5a44c5aa73c205ae4a5bb9d5ed6bb84ea7c249ece786642bbb49d06a307df218d03da41c317417"
 }
-
