@@ -21,20 +21,20 @@ pnpm add -D typescript ts-node-dev jest ts-jest @types/jest
 ⸻
 
 Stage 1 «Hello, Telegram» — 0.5 day
-	•	Create bot via @BotFather; store TELEGRAM_BOT_TOKEN in .env [x]
-	•	Minimal handler (src/telegram/bot.ts) – /ping → “pong” [x]
-	•	Jest test – mock Telegraf, expect reply('pong') [x]
+        •       Create bot via @BotFather; store TELEGRAM_BOT_TOKEN in .env [x]
+        •       Minimal handler (src/telegram/bot.ts) – /ping → “pong” [x]
+        •       Jest test – mock Telegraf, expect reply('pong') [x]
 
 :bulb: Outcome: you can send /ping and get a reply.
 
 ⸻
 
 Stage 2 «WhatsApp login & echo» — 1 day
-	•	Integrate Baileys (src/whatsapp/index.ts)
-	•	Generate QR and post to Telegram with sendPhoto
-	•	Persist creds in baileys_auth on creds.update
-	•	Command /wa <jid> <text> forwards message to WhatsApp
-	•	Jest test – mock Baileys socket, assert sendMessage
+- [x] Integrate Baileys (src/whatsapp/index.ts)
+- [x] Generate QR and post to Telegram with sendPhoto
+- [x] Persist creds in baileys_auth on creds.update
+- [x] Command /wa <jid> <text> forwards message to WhatsApp
+- [x] Jest test – mock Baileys socket, assert sendMessage
 
 :bulb: Outcome: bot sends arbitrary text from your personal WA account.
 
