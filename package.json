@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "ts-node-dev src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "jest",
@@ -16,13 +16,16 @@
     "baileys": "6.7.18",
     "dotenv": "^16.0.0",
     "prisma": "6.10.1",
+    "qrcode": "^1.5.4",
     "telegraf": "^4.16.0"
   },
   "devDependencies": {
     "@types/jest": "30.0.0",
+    "@types/qrcode": "^1.5.5",
     "jest": "30.0.3",
     "ts-jest": "^29.1.0",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.20.3",
     "typescript": "^5.0.0"
   },
   "packageManager": "pnpm@10.12.3+sha512.467df2c586056165580ad6dfb54ceaad94c5a30f80893ebdec5a44c5aa73c205ae4a5bb9d5ed6bb84ea7c249ece786642bbb49d06a307df218d03da41c317417"
