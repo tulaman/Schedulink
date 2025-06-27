@@ -12,3 +12,8 @@ migrations/
 # Jest
 coverage/
 
+# project specific
+telegram_chat_id
+.vscode/
+baileys_auth/
+last_qr.png
