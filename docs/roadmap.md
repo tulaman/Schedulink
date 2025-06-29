@@ -53,11 +53,11 @@ Stage 3 «Simple LLM agent» — 1 day
 ⸻
 
 Stage 4 «State Machine v1 — Greeting → AskSlots» — 2 days
-	•	pnpm add xstate
-	•	Define FSM (greet → askSlots → done)
-	•	Await reply, transition, ask “Hangi saatler müsait?”
-	•	Parser v0 – regex for HH:MM
-	•	Jest e2e – fake barber replies “15:30”, FSM reaches done
+- [x] pnpm add xstate
+- [x] Define FSM (greet → askSlots → done)
+- [x] Await reply, transition, ask “Hangi saatler müsait?”
+- [x] Parser v0 – regex for HH:MM
+- [x] Jest e2e – fake barber replies “15:30”, FSM reaches done
 
 :bulb: Outcome: full loop prints recognised time to logs.
 
