@@ -22,7 +22,7 @@ pnpm add -D typescript ts-node-dev jest ts-jest @types/jest
 
 Stage 1 «Hello, Telegram» — 0.5 day
  - [x] Create bot via @BotFather; store TELEGRAM_BOT_TOKEN in .env
- - [x] Minimal handler (src/telegram/bot.ts) – /ping → “pong”
+ - [x] Minimal handler (src/telegram/bot.ts) – /ping → "pong"
  - [x] Jest test – mock Telegraf, expect reply('pong')
 
 :bulb: Outcome: you can send /ping and get a reply.
@@ -43,7 +43,7 @@ Stage 2 «WhatsApp login & echo» — 1 day
 Stage 3 «Simple LLM agent» — 1 day
 - [x] Add OPENAI_API_KEY to .env
 - [x] Agent skeleton (src/agents/turkishNegotiator.ts)
-- [x] System prompt: “Native Turkish speaker …”
+- [x] System prompt: "Native Turkish speaker ..."
 - [x] generateGreeting(name)
 - [x] Command /greet – generate text & send to barber
 - [x] Jest test – mock OpenAI endpoint, ensure prompt has name
@@ -55,20 +55,20 @@ Stage 3 «Simple LLM agent» — 1 day
 Stage 4 «State Machine v1 — Greeting → AskSlots» — 2 days
 - [x] pnpm add xstate
 - [x] Define FSM (greet → askSlots → done)
-- [x] Await reply, transition, ask “Hangi saatler müsait?”
+- [x] Await reply, transition, ask "Hangi saatler müsait?"
 - [x] Parser v0 – regex for HH:MM
-- [x] Jest e2e – fake barber replies “15:30”, FSM reaches done
+- [x] Jest e2e – fake barber replies "15:30", FSM reaches done
 
 :bulb: Outcome: full loop prints recognised time to logs.
 
 ⸻
 
 Stage 5 «Google Calendar & slot ranges» — 1.5 days
-	•	Obtain Google OAuth creds (desktop flow)
-	•	Tool createCalEvent
-	•	Parser emits JSON {start,end}
-	•	On valid slot create event and finish FSM
-	•	Jest test – mock googleapis, assert call params
+- [x] Obtain Google OAuth creds (desktop flow)
+- [x] Tool createCalEvent
+- [x] Parser emits JSON {start,end}
+- [x] On valid slot create event and finish FSM
+- [x] Jest test – mock googleapis, assert call params
 
 :bulb: Outcome: meeting really appears in Google Calendar.
 
