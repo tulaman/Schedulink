@@ -1,6 +1,8 @@
 import { createBot } from './telegram/bot.js';
-import { initWhatsApp } from './whatsapp/index.js';
+import { initWhatsApp, onWaMessage } from './whatsapp/index.js';
 import fs from 'fs/promises';
+import { createActor } from 'xstate';
+import { conversationMachine } from './agents/conversationMachine.js';
 
 async function main() {
   let qrChatId: number | undefined;
@@ -10,7 +12,17 @@ async function main() {
   } catch (e) {
     // ignore
   }
-  const bot = createBot();
+
+  // create an actor instance per barber JID (single barber for MVP)
+  const convActor = createActor(conversationMachine).start();
+
+  const bot = createBot(convActor);
+
+  // wire incoming WA messages into FSM
+  onWaMessage(msg => {
+    convActor.send({ type: 'BARBER_REPLY', text: msg.text });
+  });
+
   initWhatsApp(async qr => {
     // persist QR so we can send it later on demand
     await fs.writeFile('last_qr.png', qr);

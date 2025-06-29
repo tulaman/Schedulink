@@ -2,8 +2,10 @@ import { Telegraf } from 'telegraf';
 import { sendWaMessage } from '../whatsapp/index';
 import 'dotenv/config';
 import fs from 'fs/promises';
+import { ActorRef } from 'xstate';
+import { ConversationEvent } from '../agents/conversationMachine.js';
 
-export function createBot() {
+export function createBot(fsm?: ActorRef<any, ConversationEvent>) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) throw new Error('TELEGRAM_BOT_TOKEN not set');
   const bot = new Telegraf(token);
@@ -39,6 +41,7 @@ export function createBot() {
         const { generateGreeting } = await import('../agents/turkishNegotiator.js');
         const greeting = await generateGreeting(name);
         await sendWaMessage(jid, greeting);
+        fsm?.send({ type: 'GREETING_SENT' });
         await ctx.reply('sent');
       } catch (err: any) {
         console.error('Failed to generate greeting', err);

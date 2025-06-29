@@ -1,5 +1,17 @@
 import { makeWASocket, useMultiFileAuthState, WASocket } from 'baileys';
 import QRCode from 'qrcode';
+import { EventEmitter } from 'events';
+
+export interface IncomingWaMessage {
+  jid: string;
+  text: string;
+}
+
+const waEventBus = new EventEmitter();
+
+export function onWaMessage(handler: (msg: IncomingWaMessage) => void) {
+  waEventBus.on('message', handler);
+}
 
 let sock: WASocket | null = null;
 
@@ -9,6 +21,21 @@ export async function initWhatsApp(onQR: (qrImage: Buffer) => Promise<void>) {
   async function startSock() {
     sock = makeWASocket({ auth: state });
     sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on('messages.upsert', async upsert => {
+      const messages = (upsert as any).messages as any[];
+      for (const msg of messages) {
+       // if (msg.key.fromMe) continue; // ignore our own messages
+        const jid = msg.key.remoteJid as string;
+        const text =
+          msg.message?.conversation ||
+          msg.message?.extendedTextMessage?.text ||
+          '';
+        if (text) {
+          waEventBus.emit('message', { jid, text } as IncomingWaMessage);
+        }
+      }
+    });
 
     sock.ev.on('connection.update', async update => {
       const { connection, lastDisconnect, qr } = update as any;

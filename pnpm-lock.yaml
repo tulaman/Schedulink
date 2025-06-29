@@ -29,6 +29,9 @@ importers:
       telegraf:
         specifier: ^4.16.0
         version: 4.16.3
+      xstate:
+        specifier: ^5.20.0
+        version: 5.20.0
     devDependencies:
       '@types/jest':
         specifier: 30.0.0
@@ -2767,6 +2770,9 @@ packages:
         optional: true
       utf-8-validate:
         optional: true
+
+  xstate@5.20.0:
+    resolution: {integrity: sha512-lFQ0fLwVa0OMZnjNP8zUkt2fwIS85ZBNPvxE41APVYhYj0++aTssgmsnTAiBHdKYbgnd6+L8DRTZ9jPZAFPuyw==}
 
   xtend@4.0.2:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
@@ -5938,6 +5944,8 @@ snapshots:
       signal-exit: 4.1.0
 
   ws@8.18.2: {}
+
+  xstate@5.20.0: {}
 
   xtend@4.0.2: {}
 
