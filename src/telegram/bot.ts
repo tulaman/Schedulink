@@ -2,14 +2,15 @@ import { Telegraf } from 'telegraf';
 import { sendWaMessage } from '../whatsapp/index';
 import 'dotenv/config';
 import fs from 'fs/promises';
-import { ActorRef } from 'xstate';
-import { ConversationEvent } from '../agents/conversationMachine.js';
+import { startConversationWithBarber, continueConversationWithBarber } from '../agents/barberAgent.js';
 
-export function createBot(fsm?: ActorRef<any, ConversationEvent>) {
+export function createBot() {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) throw new Error('TELEGRAM_BOT_TOKEN not set');
   const bot = new Telegraf(token);
+  
   bot.command('ping', ctx => ctx.reply('pong'));
+  
   bot.command('wa', async ctx => {
     await fs.writeFile('telegram_chat_id', String(ctx.chat.id));
     const parts = ctx.message.text.split(' ');
@@ -22,6 +23,7 @@ export function createBot(fsm?: ActorRef<any, ConversationEvent>) {
       await ctx.reply('Usage: /wa <jid> <text>');
     }
   });
+  
   bot.command('qr', async ctx => {
     await fs.writeFile('telegram_chat_id', String(ctx.chat.id));
     try {
@@ -31,6 +33,30 @@ export function createBot(fsm?: ActorRef<any, ConversationEvent>) {
       await ctx.reply('QR not generated yet – please try again in a few seconds.');
     }
   });
+
+  // New command to start barber conversation
+  bot.command('haircut', async ctx => {
+    await fs.writeFile('telegram_chat_id', String(ctx.chat.id));
+    const parts = ctx.message.text.split(' ');
+    const jid = parts[1];
+    const clientName = parts[2];
+    const barberName = parts.slice(3).join(' ') || undefined;
+    
+    if (jid && clientName) {
+      try {
+        const message = await startConversationWithBarber(jid, clientName, barberName);
+        await sendWaMessage(jid, message);
+        await ctx.reply(`✅ Randevu talebi gönderildi: "${message}"`);
+      } catch (err: any) {
+        console.error('Failed to start barber conversation', err);
+        await ctx.reply(`❌ Hata: ${err.message}`);
+      }
+    } else {
+      await ctx.reply('Usage: /haircut <barber_jid> <client_name> [barber_name]');
+    }
+  });
+
+  // Keep the old greet command for backward compatibility
   bot.command('greet', async ctx => {
     await fs.writeFile('telegram_chat_id', String(ctx.chat.id));
     const parts = ctx.message.text.split(' ');
@@ -38,18 +64,17 @@ export function createBot(fsm?: ActorRef<any, ConversationEvent>) {
     const name = parts.slice(2).join(' ');
     if (jid && name) {
       try {
-        const { generateGreeting } = await import('../agents/turkishNegotiator.js');
-        const greeting = await generateGreeting(name);
-        await sendWaMessage(jid, greeting);
-        fsm?.send({ type: 'GREETING_SENT' });
-        await ctx.reply('sent');
+        const message = await startConversationWithBarber(jid, name);
+        await sendWaMessage(jid, message);
+        await ctx.reply(`✅ Greeting sent: "${message}"`);
       } catch (err: any) {
         console.error('Failed to generate greeting', err);
-        await ctx.reply('error');
+        await ctx.reply('❌ Error occurred');
       }
     } else {
       await ctx.reply('Usage: /greet <jid> <name>');
     }
   });
+  
   return bot;
 }

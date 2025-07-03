@@ -1,3 +1,6 @@
+// Legacy function - now integrated into barberAgent.ts
+// This file is kept for backward compatibility and testing
+
 export async function generateGreeting(name: string): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY not set');

@@ -1,6 +1,7 @@
 import { makeWASocket, useMultiFileAuthState, WASocket } from 'baileys';
 import QRCode from 'qrcode';
 import { EventEmitter } from 'events';
+import { continueConversationWithBarber, getConversationContext } from '../agents/barberAgent.js';
 
 export interface IncomingWaMessage {
   jid: string;
@@ -25,14 +26,46 @@ export async function initWhatsApp(onQR: (qrImage: Buffer) => Promise<void>) {
     sock.ev.on('messages.upsert', async upsert => {
       const messages = (upsert as any).messages as any[];
       for (const msg of messages) {
-       // if (msg.key.fromMe) continue; // ignore our own messages
+        if (msg.key.fromMe) continue; // ignore our own messages
+        
         const jid = msg.key.remoteJid as string;
         const text =
           msg.message?.conversation ||
           msg.message?.extendedTextMessage?.text ||
           '';
+        
         if (text) {
+          // Emit the message for other handlers
           waEventBus.emit('message', { jid, text } as IncomingWaMessage);
+          
+          // Check if we have an active conversation with this barber
+          const conversationContext = getConversationContext(jid);
+          if (conversationContext && !conversationContext.isCompleted) {
+            try {
+              console.log(`📨 Received message from barber ${jid}: "${text}"`);
+              const response = await continueConversationWithBarber(jid, text);
+              console.log(`🤖 Agent response: "${response}"`);
+              
+              // Send the agent's response
+              await sendWaMessage(jid, response);
+              console.log(`✅ Response sent to barber ${jid}`);
+              
+              // Send update to Telegram
+              try {
+                const fs = await import('fs/promises');
+                const telegramChatId = await fs.readFile('telegram_chat_id', 'utf-8');
+                if (telegramChatId) {
+                  // Import telegraf and send update (this would need to be handled better in production)
+                  console.log(`📱 Would send Telegram update to ${telegramChatId}: Conversation update`);
+                }
+              } catch (e) {
+                // Telegram chat ID not available, skip notification
+              }
+              
+            } catch (error) {
+              console.error(`❌ Error handling message from ${jid}:`, error);
+            }
+          }
         }
       }
     });

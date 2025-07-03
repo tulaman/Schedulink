@@ -74,11 +74,25 @@ Stage 5 «Google Calendar & slot ranges» — 1.5 days
 
 ⸻
 
+Stage 5.5 «Migration to OpenAI Agents SDK» — 1.5 days
+- [x] Replace XState FSM with OpenAI Agents SDK conversational agent
+- [x] Create barberAgent.ts - main conversational agent for Turkish barber communication
+- [x] Implement conversation memory and context handling
+- [x] Add time extraction and calendar booking (via regex parsing in response)
+- [x] Update Telegram bot to use new agent architecture
+- [x] Update WhatsApp integration to forward messages to agent
+- [x] Refactor turkishNegotiator.ts logic into agent (integrated into barberAgent)
+- [ ] Jest tests - mock OpenAI Agents, test conversation flow
+
+:bulb: Outcome: fully conversational agent replaces finite state machine.
+
+⸻
+
 Stage 6 «Persistence & restart safety» — 1 day
 	•	Prisma schema – User, Barber, ConversationLog, Appointment, WaSession
-	•	Persist each FSM step & raw messages
-	•	On restart reload state & resume
-	•	Jest test – simulate crash, ensure state restored
+	•	Persist each agent conversation & raw messages
+	•	On restart reload conversation history & resume
+	•	Jest test – simulate crash, ensure conversation restored
 
 :bulb: Outcome: app survives container restarts.
 
@@ -111,7 +125,8 @@ Test utilities
 Helper	Purpose	Use in tests
 createFakeBaileys()	Simulate messages.upsert, connection.update	Jest
 mockOpenAI()	Intercept fetch to api.openai.com	Jest
-advanceTimersByDialog()	Drive FSM with fake timers	Jest
+mockOpenAIAgents()	Mock OpenAI Agents SDK responses	Jest
+advanceTimersByDialog()	Drive agent with fake timers	Jest
 
 
 ⸻
