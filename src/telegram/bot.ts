@@ -1,5 +1,5 @@
 import { Telegraf } from 'telegraf';
-import { sendWaMessage, normalizeJid } from '../whatsapp/index';
+import { sendWaMessage, sendHumanLike, normalizeJid } from '../whatsapp/index';
 import 'dotenv/config';
 import fs from 'fs/promises';
 import { startConversationWithBarber, continueConversationWithBarber } from '../agents/barberAgent.js';
@@ -56,7 +56,7 @@ export function createBot() {
       try {
         const normalizedJid = normalizeJid(jid);
         const message = await startConversationWithBarber(normalizedJid, clientName, barberName);
-        await sendWaMessage(normalizedJid, message);
+        await sendHumanLike(normalizedJid, message);
         await ctx.reply(`✅ Randevu talebi gönderildi: "${message}"`);
       } catch (err: any) {
         console.error('Failed to start barber conversation', err);
@@ -77,7 +77,7 @@ export function createBot() {
       try {
         const normalizedJid = normalizeJid(jid);
         const message = await startConversationWithBarber(normalizedJid, name);
-        await sendWaMessage(normalizedJid, message);
+        await sendHumanLike(normalizedJid, message);
         await ctx.reply(`✅ Greeting sent: "${message}"`);
       } catch (err: any) {
         console.error('Failed to generate greeting', err);

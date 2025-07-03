@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { EventEmitter } from 'events';
 import { continueConversationWithBarber, getConversationContext } from '../agents/barberAgent';
 import { sendTelegramNotification } from '../telegram/bot';
+import { TimeoutManager } from '../timeout/manager';
 
 export interface IncomingWaMessage {
   jid: string;
@@ -65,12 +66,21 @@ export async function initWhatsApp(onQR: (qrImage: Buffer) => Promise<void>) {
           if (conversationContext && !conversationContext.isCompleted) {
             try {
               console.log(`📨 Received message from barber ${normalizedJid}: "${text}"`);
+              
+              // Clear timeout since barber replied
+              TimeoutManager.clearTimeout(normalizedJid);
+              
               const response = await continueConversationWithBarber(normalizedJid, text);
               console.log(`🤖 Agent response: "${response}"`);
               
-              // Send the agent's response
-              await sendWaMessage(normalizedJid, response);
-              console.log(`✅ Response sent to barber ${normalizedJid}`);
+              // Send the agent's response with human-like behavior
+              await sendHumanLike(normalizedJid, response);
+              console.log(`✅ Human-like response sent to barber ${normalizedJid}`);
+              
+              // Start new timeout if conversation is not completed
+              if (!response.includes('[CONFIRMED:')) {
+                await TimeoutManager.startTimeout(normalizedJid);
+              }
               
               // Send update to Telegram
               try {
@@ -135,4 +145,47 @@ export function sendWaMessage(jid: string, text: string) {
   }
   
   return sock.sendMessage(normalizedJid, { text });
+}
+
+/**
+ * Send message with human-like behavior: typing indicator + random delay
+ * @param jid WhatsApp JID
+ * @param text Message text
+ * @param baseDelay Base delay in milliseconds (default: 1000-3000ms)
+ */
+export async function sendHumanLike(jid: string, text: string, baseDelay?: number): Promise<void> {
+  if (!sock) throw new Error('WhatsApp not initialised');
+  
+  const normalizedJid = normalizeJid(jid);
+  
+  // Validate JID format
+  if (!normalizedJid.match(/^.+@(s\.whatsapp\.net|g\.us)$/)) {
+    throw new Error('Invalid JID format: must end with @s.whatsapp.net or @g.us');
+  }
+  
+  // Calculate human-like delay based on message length
+  const minDelay = baseDelay || 1000; // 1 second minimum
+  const maxDelay = Math.max(minDelay + (text.length * 50), 3000); // Up to 3 seconds base + typing time
+  const randomDelay = Math.floor(Math.random() * (maxDelay - minDelay)) + minDelay;
+  
+  try {
+    // Send typing indicator (composing state)
+    await sock.sendPresenceUpdate('composing', normalizedJid);
+    console.log(`⌨️ Typing indicator sent to ${normalizedJid}`);
+    
+    // Wait for human-like delay
+    await new Promise(resolve => setTimeout(resolve, randomDelay));
+    
+    // Send the actual message
+    await sock.sendMessage(normalizedJid, { text });
+    
+    // Stop typing indicator
+    await sock.sendPresenceUpdate('available', normalizedJid);
+    
+    console.log(`✅ Human-like message sent to ${normalizedJid} after ${randomDelay}ms delay: "${text}"`);
+  } catch (error) {
+    console.error(`❌ Failed to send human-like message to ${normalizedJid}:`, error);
+    // Fallback to regular message sending
+    await sock.sendMessage(normalizedJid, { text });
+  }
 }

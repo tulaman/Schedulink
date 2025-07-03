@@ -317,6 +317,66 @@ class DatabaseService {
       // Don't throw error to prevent startup failure - just log and continue
     }
   }
+
+  // Timeout tracking methods
+  async markAwaitingReply(barberJid: string): Promise<void> {
+    const barber = await this.findOrCreateBarber(barberJid);
+    
+    // Update the latest conversation log to mark as awaiting reply
+    await prisma.conversationLog.updateMany({
+      where: { 
+        barberId: barber.id,
+        messageType: 'sent'
+      },
+      data: { 
+        awaitingReply: true,
+        lastSentAt: new Date()
+      }
+    });
+  }
+
+  async markReminderSent(barberJid: string): Promise<void> {
+    const barber = await this.findOrCreateBarber(barberJid);
+    
+    await prisma.conversationLog.updateMany({
+      where: { 
+        barberId: barber.id,
+        awaitingReply: true
+      },
+      data: { 
+        reminderSentAt: new Date()
+      }
+    });
+  }
+
+  async markEscalated(barberJid: string): Promise<void> {
+    const barber = await this.findOrCreateBarber(barberJid);
+    
+    await prisma.conversationLog.updateMany({
+      where: { 
+        barberId: barber.id,
+        awaitingReply: true
+      },
+      data: { 
+        escalatedAt: new Date(),
+        awaitingReply: false // No longer awaiting reply as it's escalated
+      }
+    });
+  }
+
+  async clearAwaitingReply(barberJid: string): Promise<void> {
+    const barber = await this.findOrCreateBarber(barberJid);
+    
+    await prisma.conversationLog.updateMany({
+      where: { 
+        barberId: barber.id,
+        awaitingReply: true
+      },
+      data: { 
+        awaitingReply: false
+      }
+    });
+  }
 }
 
 export const dbService = new DatabaseService();

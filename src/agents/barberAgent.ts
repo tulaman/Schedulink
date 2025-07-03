@@ -3,6 +3,7 @@ import { createCalEvent } from '../calendar/google';
 import dbService from '../database/service';
 import { normalizeJid } from '../whatsapp/index';
 import { sendTelegramNotification } from '../telegram/bot';
+import { TimeoutManager } from '../timeout/manager';
 
 export interface ConversationContext {
   barberName?: string;
@@ -52,6 +53,9 @@ export async function startConversationWithBarber(
   // Save initial message to database with normalized JID
   await dbService.saveConversationMessage(normalizedJid, message, 'sent');
   
+  // Start timeout tracking for the initial message
+  await TimeoutManager.startTimeout(normalizedJid);
+  
   return message;
 }
 
@@ -64,6 +68,9 @@ export async function continueConversationWithBarber(
   
   // Save the received message from barber
   await dbService.saveConversationMessage(normalizedJid, barberMessage, 'received');
+  
+  // Clear awaiting reply status since barber responded
+  await dbService.clearAwaitingReply(normalizedJid);
   
   const userPrompt = `Berber şöyle cevap verdi: "${barberMessage}"\n\nBu mesaja uygun şekilde cevap ver. Eğer saat önerdi ve uygunsa onayla ve randevuyu kesinleştir. Eğer randevu kesinleştiyse mesajın sonuna [CONFIRMED:HH:MM] formatında ekle.`;
   

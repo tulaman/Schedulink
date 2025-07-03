@@ -2,6 +2,7 @@ import { createBot } from './telegram/bot.js';
 import { initWhatsApp } from './whatsapp/index.js';
 import fs from 'fs/promises';
 import dbService from './database/service.js';
+import { TimeoutManager } from './timeout/manager.js';
 
 async function main() {
   // Initialize database
@@ -50,12 +51,14 @@ async function main() {
   // Graceful shutdown
   process.on('SIGINT', async () => {
     console.log('Shutting down gracefully...');
+    TimeoutManager.clearAllTimeouts();
     await dbService.disconnect();
     process.exit(0);
   });
 
   process.on('SIGTERM', async () => {
     console.log('Shutting down gracefully...');
+    TimeoutManager.clearAllTimeouts();
     await dbService.disconnect();
     process.exit(0);
   });

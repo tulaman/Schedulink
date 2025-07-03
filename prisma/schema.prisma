@@ -45,6 +45,10 @@ model ConversationLog {
   messageType String // 'sent' | 'received' | 'system'
   timestamp DateTime @default(now())
   isCompleted Boolean @default(false)
+  awaitingReply Boolean @default(false) // For timeout tracking
+  lastSentAt DateTime? // Last message sent timestamp
+  reminderSentAt DateTime? // When reminder was sent
+  escalatedAt DateTime? // When escalated to Telegram
   
   barber Barber @relation(fields: [barberId], references: [id])
   user User? @relation(fields: [userId], references: [id])
