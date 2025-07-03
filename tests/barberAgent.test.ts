@@ -10,7 +10,7 @@ jest.mock('@openai/agents', () => ({
 
 // Mock calendar
 jest.mock('../src/calendar/google', () => ({
-  createCalEvent: jest.fn().mockResolvedValue({}),
+  createCalEvent: jest.fn(),
 }));
 
 const { run } = require('@openai/agents');
