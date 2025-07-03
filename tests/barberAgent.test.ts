@@ -21,8 +21,13 @@ jest.mock('../src/calendar/google', () => ({
   createCalEvent: jest.fn(),
 }));
 
+jest.mock('../src/telegram/bot', () => ({
+  sendTelegramNotification: jest.fn(),
+}));
+
 const { run } = require('@openai/agents');
 const { createCalEvent } = require('../src/calendar/google');
+const { sendTelegramNotification } = require('../src/telegram/bot');
 
 const prisma = new PrismaClient({
   datasourceUrl: 'file:./test.db'
@@ -31,6 +36,7 @@ const prisma = new PrismaClient({
 describe('BarberAgent - OpenAI Agents SDK Integration', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
+    (sendTelegramNotification as jest.MockedFunction<typeof sendTelegramNotification>).mockResolvedValue(undefined);
     
     // Clean database before each test - order matters for foreign key constraints
     await prisma.conversationLog.deleteMany();
@@ -136,6 +142,17 @@ describe('BarberAgent - OpenAI Agents SDK Integration', () => {
         end: expect.any(Date),
         summary: 'Saç kesimi - Mehmet Berber'
       });
+
+      // Check that Telegram notification was sent
+      expect(sendTelegramNotification).toHaveBeenCalledWith(
+        expect.stringContaining('🎉 Отлично! Запись подтверждена!')
+      );
+      expect(sendTelegramNotification).toHaveBeenCalledWith(
+        expect.stringContaining('📅 Время: 15:30')
+      );
+      expect(sendTelegramNotification).toHaveBeenCalledWith(
+        expect.stringContaining('👨‍💼 Барбер: Mehmet Berber')
+      );
 
       // Check conversation is completed
       const context = await getConversationContext('test@whatsapp.net');

@@ -2,6 +2,7 @@ import { makeWASocket, useMultiFileAuthState, WASocket } from 'baileys';
 import QRCode from 'qrcode';
 import { EventEmitter } from 'events';
 import { continueConversationWithBarber, getConversationContext } from '../agents/barberAgent';
+import { sendTelegramNotification } from '../telegram/bot';
 
 export interface IncomingWaMessage {
   jid: string;
@@ -73,14 +74,17 @@ export async function initWhatsApp(onQR: (qrImage: Buffer) => Promise<void>) {
               
               // Send update to Telegram
               try {
-                const fs = await import('fs/promises');
-                const telegramChatId = await fs.readFile('telegram_chat_id', 'utf-8');
-                if (telegramChatId) {
-                  // Import telegraf and send update (this would need to be handled better in production)
-                  console.log(`📱 Would send Telegram update to ${telegramChatId}: Conversation update`);
+                // Check if appointment was confirmed in this response
+                const isConfirmed = response.includes('[CONFIRMED:');
+                
+                if (!isConfirmed) {
+                  // Send conversation update (only if not confirmed, as confirmation sends its own notification)
+                  const barberName = conversationContext?.barberName || 'Барбер';
+                  const updateMessage = `💬 Обновление разговора с ${barberName}:\n\n📨 Барбер: "${text}"\n🤖 Ответ: "${response}"`;
+                  await sendTelegramNotification(updateMessage);
                 }
-              } catch (e) {
-                // Telegram chat ID not available, skip notification
+              } catch (error) {
+                console.error('Failed to send Telegram conversation update:', error);
               }
               
             } catch (error) {

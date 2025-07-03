@@ -2,6 +2,7 @@ import { Agent, run } from '@openai/agents';
 import { createCalEvent } from '../calendar/google';
 import dbService from '../database/service';
 import { normalizeJid } from '../whatsapp/index';
+import { sendTelegramNotification } from '../telegram/bot';
 
 export interface ConversationContext {
   barberName?: string;
@@ -91,6 +92,17 @@ export async function continueConversationWithBarber(
       console.log(`📅 Calendar event created for ${time}`);
     } catch (error) {
       console.error('Failed to create calendar event:', error);
+    }
+    
+    // Send notification to Telegram
+    try {
+      const barberName = context?.barberName || 'Берберов';
+      const clientName = context?.clientName || 'вас';
+      const notificationMessage = `🎉 Отлично! Запись подтверждена!\n\n📅 Время: ${time}\n👨‍💼 Барбер: ${barberName}\n👤 Клиент: ${clientName}\n\n✅ Встреча добавлена в ваш календарь Google.`;
+      
+      await sendTelegramNotification(notificationMessage);
+    } catch (error) {
+      console.error('Failed to send Telegram notification:', error);
     }
   }
   

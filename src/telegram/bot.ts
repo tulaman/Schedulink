@@ -4,10 +4,15 @@ import 'dotenv/config';
 import fs from 'fs/promises';
 import { startConversationWithBarber, continueConversationWithBarber } from '../agents/barberAgent.js';
 
+let botInstance: Telegraf | null = null;
+
 export function createBot() {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) throw new Error('TELEGRAM_BOT_TOKEN not set');
   const bot = new Telegraf(token);
+  
+  // Store bot instance for notifications
+  botInstance = bot;
   
   bot.command('ping', ctx => ctx.reply('pong'));
   
@@ -84,4 +89,22 @@ export function createBot() {
   });
   
   return bot;
+}
+
+export async function sendTelegramNotification(message: string): Promise<void> {
+  try {
+    const telegramChatIdStr = await fs.readFile('telegram_chat_id', 'utf-8');
+    const telegramChatId = parseInt(telegramChatIdStr.trim(), 10);
+    
+    if (botInstance && telegramChatId) {
+      await botInstance.telegram.sendMessage(telegramChatId, message);
+      console.log(`📱 Telegram notification sent: ${message}`);
+    }
+  } catch (error) {
+    console.error('Failed to send Telegram notification:', error);
+  }
+}
+
+export function getBotInstance(): Telegraf | null {
+  return botInstance;
 }
