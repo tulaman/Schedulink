@@ -17,10 +17,14 @@ export function createBot() {
     const jid = parts[1];
     const text = parts.slice(2).join(' ');
     if (jid && text) {
-      await sendWaMessage(jid, text);
-      await ctx.reply('sent');
+      try {
+        await sendWaMessage(jid, text);
+        await ctx.reply('sent');
+      } catch (err: any) {
+        await ctx.reply(`❌ Error: ${err.message}`);
+      }
     } else {
-      await ctx.reply('Usage: /wa <jid> <text>');
+      await ctx.reply('Usage: /wa <phone_number_or_jid> <text>\nExample: /wa 905551234567 Hello\nOr: /wa 905551234567@s.whatsapp.net Hello');
     }
   });
   
@@ -52,7 +56,7 @@ export function createBot() {
         await ctx.reply(`❌ Hata: ${err.message}`);
       }
     } else {
-      await ctx.reply('Usage: /haircut <barber_jid> <client_name> [barber_name]');
+      await ctx.reply('Usage: /haircut <barber_phone_or_jid> <client_name> [barber_name]\nExample: /haircut 905551234567 Ahmet [Berber Mehmet]');
     }
   });
 
@@ -69,10 +73,10 @@ export function createBot() {
         await ctx.reply(`✅ Greeting sent: "${message}"`);
       } catch (err: any) {
         console.error('Failed to generate greeting', err);
-        await ctx.reply('❌ Error occurred');
+        await ctx.reply(`❌ Error: ${err.message}`);
       }
     } else {
-      await ctx.reply('Usage: /greet <jid> <name>');
+      await ctx.reply('Usage: /greet <phone_number_or_jid> <name>\nExample: /greet 905551234567 Ahmet');
     }
   });
   

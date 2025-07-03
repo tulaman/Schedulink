@@ -100,5 +100,27 @@ export async function initWhatsApp(onQR: (qrImage: Buffer) => Promise<void>) {
 
 export function sendWaMessage(jid: string, text: string) {
   if (!sock) throw new Error('WhatsApp not initialised');
-  return sock.sendMessage(jid, { text });
+  
+  // Validate and format JID
+  if (!jid || typeof jid !== 'string') {
+    throw new Error('Invalid JID: JID must be a non-empty string');
+  }
+  
+  // Format JID if it's just a phone number
+  let formattedJid = jid;
+  if (!jid.includes('@')) {
+    // Remove any non-digit characters and ensure it's a valid phone number
+    const phoneNumber = jid.replace(/[^\d]/g, '');
+    if (phoneNumber.length < 10) {
+      throw new Error('Invalid phone number: must be at least 10 digits');
+    }
+    formattedJid = `${phoneNumber}@s.whatsapp.net`;
+  }
+  
+  // Validate that the JID has a proper format
+  if (!formattedJid.match(/^.+@(s\.whatsapp\.net|g\.us)$/)) {
+    throw new Error('Invalid JID format: must end with @s.whatsapp.net or @g.us');
+  }
+  
+  return sock.sendMessage(formattedJid, { text });
 }
