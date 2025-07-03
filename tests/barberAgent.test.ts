@@ -1,4 +1,5 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { PrismaClient } from '@prisma/client';
 import { 
   startConversationWithBarber, 
   continueConversationWithBarber,
@@ -22,9 +23,19 @@ jest.mock('../src/calendar/google', () => ({
 const { run } = require('@openai/agents');
 const { createCalEvent } = require('../src/calendar/google');
 
+const prisma = new PrismaClient({
+  datasourceUrl: 'file:./test.db'
+});
+
 describe('BarberAgent - OpenAI Agents SDK Integration', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
+    
+    // Clean database before each test
+    await prisma.conversationLog.deleteMany();
+    await prisma.appointment.deleteMany();
+    await prisma.barber.deleteMany();
+    await prisma.user.deleteMany();
   });
 
   describe('Initial conversation flow', () => {
@@ -44,7 +55,7 @@ describe('BarberAgent - OpenAI Agents SDK Integration', () => {
       );
 
       // Check conversation context is created
-      const context = getConversationContext('test@whatsapp.net');
+      const context = await getConversationContext('test@whatsapp.net');
       expect(context).toEqual({
         clientName: 'Ahmet',
         barberName: 'Mehmet Berber',
@@ -117,10 +128,10 @@ describe('BarberAgent - OpenAI Agents SDK Integration', () => {
       });
 
       // Check conversation is completed
-      const context = getConversationContext('test@whatsapp.net');
+      const context = await getConversationContext('test@whatsapp.net');
       expect(context?.appointmentTime).toBe('15:30');
       expect(context?.isCompleted).toBe(true);
-      expect(isConversationCompleted('test@whatsapp.net')).toBe(true);
+      expect(await isConversationCompleted('test@whatsapp.net')).toBe(true);
     });
 
     it('should handle appointment confirmation without barber name', async () => {
@@ -164,15 +175,22 @@ describe('BarberAgent - OpenAI Agents SDK Integration', () => {
   });
 
   describe('Conversation state management', () => {
-    it('should throw error for non-existent conversation', async () => {
-      await expect(
-        continueConversationWithBarber('nonexistent@whatsapp.net', 'test message')
-      ).rejects.toThrow('Conversation not found');
+    it('should handle non-existent conversation gracefully', async () => {
+      // Mock a response for non-existent conversation
+      (run as jest.MockedFunction<typeof run>).mockResolvedValue({
+        finalOutput: 'Response to unknown conversation',
+        history: []
+      });
+
+      // Should not throw error - will create new conversation entry
+      const result = await continueConversationWithBarber('nonexistent@whatsapp.net', 'test message');
+      expect(result).toBe('Response to unknown conversation');
     });
 
     it('should track active conversations', async () => {
       // Count current active conversations
-      const initialActiveCount = getAllActiveConversations().length;
+      const initialActiveConversations = await getAllActiveConversations();
+      const initialActiveCount = initialActiveConversations.length;
       
       // Start multiple conversations
       (run as jest.MockedFunction<typeof run>).mockResolvedValue({
@@ -183,7 +201,7 @@ describe('BarberAgent - OpenAI Agents SDK Integration', () => {
       await startConversationWithBarber('user1@whatsapp.net', 'User1');
       await startConversationWithBarber('user2@whatsapp.net', 'User2');
 
-      const activeConversations = getAllActiveConversations();
+      const activeConversations = await getAllActiveConversations();
       expect(activeConversations).toContain('user1@whatsapp.net');
       expect(activeConversations).toContain('user2@whatsapp.net');
       expect(activeConversations).toHaveLength(initialActiveCount + 2);
@@ -197,7 +215,7 @@ describe('BarberAgent - OpenAI Agents SDK Integration', () => {
       });
       await startConversationWithBarber('user3@whatsapp.net', 'User3');
 
-      let activeConversations = getAllActiveConversations();
+      let activeConversations = await getAllActiveConversations();
       expect(activeConversations).toContain('user3@whatsapp.net');
 
       // Complete conversation
@@ -207,7 +225,7 @@ describe('BarberAgent - OpenAI Agents SDK Integration', () => {
       });
       await continueConversationWithBarber('user3@whatsapp.net', 'uygun');
 
-      activeConversations = getAllActiveConversations();
+      activeConversations = await getAllActiveConversations();
       expect(activeConversations).not.toContain('user3@whatsapp.net');
     });
   });
@@ -250,7 +268,7 @@ describe('BarberAgent - OpenAI Agents SDK Integration', () => {
       
       // Should not crash and should not mark as completed
       expect(result).toBe('Tamam! [CONFIRMED:invalid-time]');
-      expect(isConversationCompleted('malformed@whatsapp.net')).toBe(false);
+      expect(await isConversationCompleted('malformed@whatsapp.net')).toBe(false);
     });
   });
 }); 

@@ -17,3 +17,5 @@ telegram_chat_id
 .vscode/
 baileys_auth/
 last_qr.png
+dev.db
+test.db

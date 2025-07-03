@@ -4,6 +4,7 @@ services:
     build: .
     environment:
       - NODE_ENV=development
+      - DATABASE_URL=mysql://root:root@mysql:3306/schedulink
     ports:
       - "3000:3000"
     depends_on:

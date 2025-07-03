@@ -12,7 +12,10 @@ Features
 	•	Supports Turkish barber communication (extensible to other languages)
 	•	Google Calendar auto-sync with reminders
 	•	Conversational AI agent replaces finite state machine
-	•	Built with Node 20 + TypeScript & OpenAI Agents SDK
+	•	**Database persistence**: Conversations survive app restarts
+	•	**Automatic recovery**: Resume incomplete conversations on startup
+	•	**Complete tracking**: All messages, appointments, and context preserved
+	•	Built with Node 20 + TypeScript & OpenAI Agents SDK + Prisma
 
 ⸻
 
@@ -95,11 +98,13 @@ Project Structure
 
 Development Status
 
-Current implementation (Stage 5.5): ✅ **OpenAI Agents SDK Migration Complete**
+Current implementation (Stage 6): ✅ **Persistence & Restart Safety Complete**
+- Database persistence with Prisma + SQLite/MySQL
+- Conversation recovery after application restarts
+- Automatic conversation and appointment tracking
+- Comprehensive test coverage with crash simulation
 - Conversational AI agent for Turkish barber communication
-- Automatic conversation handling
 - Calendar integration with confirmed appointments
-- Modern agent architecture replaces finite state machines
 
 See docs/roadmap.md for detailed progress.
 

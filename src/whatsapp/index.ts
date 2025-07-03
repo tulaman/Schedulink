@@ -39,7 +39,7 @@ export async function initWhatsApp(onQR: (qrImage: Buffer) => Promise<void>) {
           waEventBus.emit('message', { jid, text } as IncomingWaMessage);
           
           // Check if we have an active conversation with this barber
-          const conversationContext = getConversationContext(jid);
+          const conversationContext = await getConversationContext(jid);
           if (conversationContext && !conversationContext.isCompleted) {
             try {
               console.log(`📨 Received message from barber ${jid}: "${text}"`);

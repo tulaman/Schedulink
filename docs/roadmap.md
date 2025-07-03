@@ -89,10 +89,10 @@ Stage 5.5 «Migration to OpenAI Agents SDK» — 1.5 days
 ⸻
 
 Stage 6 «Persistence & restart safety» — 1 day
-	•	Prisma schema – User, Barber, ConversationLog, Appointment, WaSession
-	•	Persist each agent conversation & raw messages
-	•	On restart reload conversation history & resume
-	•	Jest test – simulate crash, ensure conversation restored
+- [x] Prisma schema – User, Barber, ConversationLog, Appointment, WaSession
+- [x] Persist each agent conversation & raw messages
+- [x] On restart reload conversation history & resume
+- [x] Jest test – simulate crash, ensure conversation restored
 
 :bulb: Outcome: app survives container restarts.
 

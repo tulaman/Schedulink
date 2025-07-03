@@ -1,8 +1,23 @@
 import { createBot } from './telegram/bot.js';
 import { initWhatsApp } from './whatsapp/index.js';
 import fs from 'fs/promises';
+import dbService from './database/service.js';
 
 async function main() {
+  // Initialize database
+  try {
+    await dbService.initDatabase();
+    
+    // Restore incomplete conversations on startup
+    const incompleteConversations = await dbService.getAllIncompleteConversations();
+    if (incompleteConversations.length > 0) {
+      console.log(`🔄 Restored ${incompleteConversations.length} incomplete conversations: ${incompleteConversations.join(', ')}`);
+    }
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+    process.exit(1);
+  }
+
   let qrChatId: number | undefined;
   try {
     const chatIdStr = await fs.readFile('telegram_chat_id', 'utf-8');
@@ -31,6 +46,19 @@ async function main() {
   
   bot.launch();
   console.log('Schedulink container started.');
+
+  // Graceful shutdown
+  process.on('SIGINT', async () => {
+    console.log('Shutting down gracefully...');
+    await dbService.disconnect();
+    process.exit(0);
+  });
+
+  process.on('SIGTERM', async () => {
+    console.log('Shutting down gracefully...');
+    await dbService.disconnect();
+    process.exit(0);
+  });
 }
 
 main();

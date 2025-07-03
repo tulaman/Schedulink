@@ -1,0 +1,82 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id String @id @default(cuid())
+  telegramChatId String @unique
+  name String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  appointments Appointment[]
+  conversationLogs ConversationLog[]
+  
+  @@map("users")
+}
+
+model Barber {
+  id String @id @default(cuid())
+  jid String @unique // WhatsApp JID
+  name String?
+  phoneNumber String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  appointments Appointment[]
+  conversationLogs ConversationLog[]
+  
+  @@map("barbers")
+}
+
+model ConversationLog {
+  id String @id @default(cuid())
+  barberId String
+  userId String?
+  messageText String
+  messageType String // 'sent' | 'received' | 'system'
+  timestamp DateTime @default(now())
+  isCompleted Boolean @default(false)
+  
+  barber Barber @relation(fields: [barberId], references: [id])
+  user User? @relation(fields: [userId], references: [id])
+  
+  @@map("conversation_logs")
+}
+
+model Appointment {
+  id String @id @default(cuid())
+  barberId String
+  userId String?
+  clientName String
+  appointmentTime String
+  appointmentDate DateTime?
+  status String @default("pending") // 'pending' | 'confirmed' | 'cancelled'
+  calendarEventId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  barber Barber @relation(fields: [barberId], references: [id])
+  user User? @relation(fields: [userId], references: [id])
+  
+  @@map("appointments")
+}
+
+model WaSession {
+  id String @id @default(cuid())
+  sessionData String
+  lastConnected DateTime?
+  isActive Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("wa_sessions")
+} 
