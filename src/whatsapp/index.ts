@@ -1,7 +1,7 @@
 import { makeWASocket, useMultiFileAuthState, WASocket } from 'baileys';
 import QRCode from 'qrcode';
 import { EventEmitter } from 'events';
-import { continueConversationWithBarber, getConversationContext } from '../agents/barberAgent.js';
+import { continueConversationWithBarber, getConversationContext } from '../agents/barberAgent';
 
 export interface IncomingWaMessage {
   jid: string;

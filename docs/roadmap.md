@@ -82,7 +82,7 @@ Stage 5.5 «Migration to OpenAI Agents SDK» — 1.5 days
 - [x] Update Telegram bot to use new agent architecture
 - [x] Update WhatsApp integration to forward messages to agent
 - [x] Refactor turkishNegotiator.ts logic into agent (integrated into barberAgent)
-- [ ] Jest tests - mock OpenAI Agents, test conversation flow
+- [x] Jest tests - mock OpenAI Agents, test conversation flow
 
 :bulb: Outcome: fully conversational agent replaces finite state machine.
 

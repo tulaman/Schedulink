@@ -1,5 +1,5 @@
 import { Agent, run } from '@openai/agents';
-import { createCalEvent } from '../calendar/google.js';
+import { createCalEvent } from '../calendar/google';
 
 export interface ConversationContext {
   barberName?: string;
