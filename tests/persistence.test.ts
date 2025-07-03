@@ -26,7 +26,7 @@ describe('Stage 6: Persistence & Restart Safety', () => {
   });
 
   beforeEach(async () => {
-    // Clean database before each test
+    // Clean database before each test - order matters for foreign key constraints
     await prisma.conversationLog.deleteMany();
     await prisma.appointment.deleteMany();
     await prisma.barber.deleteMany();
@@ -34,7 +34,7 @@ describe('Stage 6: Persistence & Restart Safety', () => {
   });
 
   afterAll(async () => {
-    // Clean up
+    // Clean up - order matters for foreign key constraints
     await prisma.conversationLog.deleteMany();
     await prisma.appointment.deleteMany();
     await prisma.barber.deleteMany();

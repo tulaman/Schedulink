@@ -1,5 +1,5 @@
 import { Telegraf } from 'telegraf';
-import { sendWaMessage } from '../whatsapp/index';
+import { sendWaMessage, normalizeJid } from '../whatsapp/index';
 import 'dotenv/config';
 import fs from 'fs/promises';
 import { startConversationWithBarber, continueConversationWithBarber } from '../agents/barberAgent.js';
@@ -18,7 +18,8 @@ export function createBot() {
     const text = parts.slice(2).join(' ');
     if (jid && text) {
       try {
-        await sendWaMessage(jid, text);
+        const normalizedJid = normalizeJid(jid);
+        await sendWaMessage(normalizedJid, text);
         await ctx.reply('sent');
       } catch (err: any) {
         await ctx.reply(`❌ Error: ${err.message}`);
@@ -48,8 +49,9 @@ export function createBot() {
     
     if (jid && clientName) {
       try {
-        const message = await startConversationWithBarber(jid, clientName, barberName);
-        await sendWaMessage(jid, message);
+        const normalizedJid = normalizeJid(jid);
+        const message = await startConversationWithBarber(normalizedJid, clientName, barberName);
+        await sendWaMessage(normalizedJid, message);
         await ctx.reply(`✅ Randevu talebi gönderildi: "${message}"`);
       } catch (err: any) {
         console.error('Failed to start barber conversation', err);
@@ -68,8 +70,9 @@ export function createBot() {
     const name = parts.slice(2).join(' ');
     if (jid && name) {
       try {
-        const message = await startConversationWithBarber(jid, name);
-        await sendWaMessage(jid, message);
+        const normalizedJid = normalizeJid(jid);
+        const message = await startConversationWithBarber(normalizedJid, name);
+        await sendWaMessage(normalizedJid, message);
         await ctx.reply(`✅ Greeting sent: "${message}"`);
       } catch (err: any) {
         console.error('Failed to generate greeting', err);

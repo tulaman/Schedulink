@@ -1,26 +1,35 @@
 import { Telegraf } from 'telegraf';
 import { createBot } from '../src/telegram/bot';
-import { sendWaMessage } from '../src/whatsapp';
 import fs from 'fs/promises';
 
 jest.mock('telegraf');
-jest.mock('../src/whatsapp');
 jest.mock('fs/promises');
 
-const TelegrafMock = Telegraf as jest.MockedClass<typeof Telegraf>;
-const sendMock = sendWaMessage as jest.MockedFunction<typeof sendWaMessage>;
+// Mock the WhatsApp module properly
+jest.mock('../src/whatsapp/index', () => ({
+  sendWaMessage: jest.fn(),
+  normalizeJid: jest.fn((jid: string) => {
+    if (jid.includes('@')) return jid;
+    if (jid.length < 10) throw new Error('Invalid phone number: must be at least 10 digits');
+    return `${jid.replace(/[^\d]/g, '')}@s.whatsapp.net`;
+  })
+}));
 
+const TelegrafMock = Telegraf as jest.MockedClass<typeof Telegraf>;
 const fsMock = fs as jest.Mocked<typeof fs>;
+
+// Import the mocked functions
+const { sendWaMessage: mockSendWaMessage } = jest.requireMock('../src/whatsapp/index');
 
 describe('Telegram Bot WhatsApp Integration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('forwards /wa to WhatsApp successfully', async () => {
+  it('forwards /wa to WhatsApp successfully with phone number', async () => {
     const reply = jest.fn();
     fsMock.writeFile.mockResolvedValue(undefined);
-    sendMock.mockResolvedValue(undefined as any);
+    mockSendWaMessage.mockResolvedValue(undefined as any);
     
     let handlerPromise: Promise<any> = Promise.resolve();
     TelegrafMock.mockImplementation(() => {
@@ -43,14 +52,14 @@ describe('Telegram Bot WhatsApp Integration', () => {
     await handlerPromise;
     await Promise.resolve();
     
-    expect(sendMock).toHaveBeenCalledWith('905551234567', 'hey');
+    expect(mockSendWaMessage).toHaveBeenCalledWith('905551234567@s.whatsapp.net', 'hey');
     expect(reply).toHaveBeenCalledWith('sent');
   });
 
-  it('handles /wa command with invalid JID', async () => {
+  it('forwards /wa to WhatsApp successfully with full JID', async () => {
     const reply = jest.fn();
     fsMock.writeFile.mockResolvedValue(undefined);
-    sendMock.mockRejectedValue(new Error('Invalid JID format: must end with @s.whatsapp.net or @g.us'));
+    mockSendWaMessage.mockResolvedValue(undefined as any);
     
     let handlerPromise: Promise<any> = Promise.resolve();
     TelegrafMock.mockImplementation(() => {
@@ -59,7 +68,7 @@ describe('Telegram Bot WhatsApp Integration', () => {
           if (cmd === 'wa') {
             handlerPromise = handler({
               chat: { id: 1 },
-              message: { text: '/wa invalid_jid hey' },
+              message: { text: '/wa 905551234567@s.whatsapp.net hey' },
               reply
             } as any);
           }
@@ -73,8 +82,36 @@ describe('Telegram Bot WhatsApp Integration', () => {
     await handlerPromise;
     await Promise.resolve();
     
-    expect(sendMock).toHaveBeenCalledWith('invalid_jid', 'hey');
-    expect(reply).toHaveBeenCalledWith('❌ Error: Invalid JID format: must end with @s.whatsapp.net or @g.us');
+    expect(mockSendWaMessage).toHaveBeenCalledWith('905551234567@s.whatsapp.net', 'hey');
+    expect(reply).toHaveBeenCalledWith('sent');
+  });
+
+  it('handles /wa command with invalid JID', async () => {
+    const reply = jest.fn();
+    fsMock.writeFile.mockResolvedValue(undefined);
+    
+    let handlerPromise: Promise<any> = Promise.resolve();
+    TelegrafMock.mockImplementation(() => {
+      return {
+        command(cmd: string, handler: any) {
+          if (cmd === 'wa') {
+            handlerPromise = handler({
+              chat: { id: 1 },
+              message: { text: '/wa 123 hey' },
+              reply
+            } as any);
+          }
+          return this;
+        }
+      } as any;
+    });
+    
+    process.env.TELEGRAM_BOT_TOKEN = 't';
+    createBot();
+    await handlerPromise;
+    await Promise.resolve();
+    
+    expect(reply).toHaveBeenCalledWith('❌ Error: Invalid phone number: must be at least 10 digits');
   });
 
   it('shows usage message for incomplete /wa command', async () => {

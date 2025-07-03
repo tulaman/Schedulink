@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, jest, beforeEach, afterAll } from '@jest/globals';
 import { PrismaClient } from '@prisma/client';
 import { 
   startConversationWithBarber, 
@@ -7,6 +7,7 @@ import {
   isConversationCompleted,
   getAllActiveConversations
 } from '../src/agents/barberAgent';
+import dbService from '../src/database/service';
 
 // Mock OpenAI Agents SDK
 jest.mock('@openai/agents', () => ({
@@ -31,11 +32,20 @@ describe('BarberAgent - OpenAI Agents SDK Integration', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     
-    // Clean database before each test
+    // Clean database before each test - order matters for foreign key constraints
     await prisma.conversationLog.deleteMany();
     await prisma.appointment.deleteMany();
     await prisma.barber.deleteMany();
     await prisma.user.deleteMany();
+  });
+
+  afterAll(async () => {
+    // Clean up - order matters for foreign key constraints
+    await prisma.conversationLog.deleteMany();
+    await prisma.appointment.deleteMany();
+    await prisma.barber.deleteMany();
+    await prisma.user.deleteMany();
+    await dbService.disconnect();
   });
 
   describe('Initial conversation flow', () => {

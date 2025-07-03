@@ -1,6 +1,7 @@
 import { Agent, run } from '@openai/agents';
 import { createCalEvent } from '../calendar/google';
 import dbService from '../database/service';
+import { normalizeJid } from '../whatsapp/index';
 
 export interface ConversationContext {
   barberName?: string;
@@ -34,6 +35,9 @@ export async function startConversationWithBarber(
   clientName: string, 
   barberName?: string
 ): Promise<string> {
+  // Normalize JID to ensure consistency
+  const normalizedJid = normalizeJid(jid);
+  
   const initialPrompt = barberName 
     ? `${barberName} ismindeki berbere ${clientName} adına saç kesimi randevusu almak için samimi bir mesaj yaz. Bugün veya yarın için uygun saatleri sor.`
     : `${clientName} adına berbere saç kesimi randevusu almak için samimi bir mesaj yaz. Bugün veya yarın için uygun saatleri sor.`;
@@ -41,11 +45,11 @@ export async function startConversationWithBarber(
   const result = await run(barberAgent, initialPrompt);
   const message = result.finalOutput || 'Hata oluştu';
   
-  // Save conversation context (client and barber info)
-  await dbService.saveConversationContext(jid, clientName, barberName);
+  // Save conversation context (client and barber info) with normalized JID
+  await dbService.saveConversationContext(normalizedJid, clientName, barberName);
   
-  // Save initial message to database
-  await dbService.saveConversationMessage(jid, message, 'sent');
+  // Save initial message to database with normalized JID
+  await dbService.saveConversationMessage(normalizedJid, message, 'sent');
   
   return message;
 }
@@ -54,8 +58,11 @@ export async function continueConversationWithBarber(
   jid: string,
   barberMessage: string
 ): Promise<string> {
+  // Normalize JID to ensure consistency
+  const normalizedJid = normalizeJid(jid);
+  
   // Save the received message from barber
-  await dbService.saveConversationMessage(jid, barberMessage, 'received');
+  await dbService.saveConversationMessage(normalizedJid, barberMessage, 'received');
   
   const userPrompt = `Berber şöyle cevap verdi: "${barberMessage}"\n\nBu mesaja uygun şekilde cevap ver. Eğer saat önerdi ve uygunsa onayla ve randevuyu kesinleştir. Eğer randevu kesinleştiyse mesajın sonuna [CONFIRMED:HH:MM] formatında ekle.`;
   
@@ -64,19 +71,19 @@ export async function continueConversationWithBarber(
   const response = result.finalOutput || 'Hata oluştu';
   
   // Save our response
-  await dbService.saveConversationMessage(jid, response, 'sent');
+  await dbService.saveConversationMessage(normalizedJid, response, 'sent');
   
   // Check if appointment was confirmed
   const confirmedMatch = response.match(/\[CONFIRMED:(\d{1,2}:\d{2})\]/);
   if (confirmedMatch) {
     const time = confirmedMatch[1];
-    const context = await dbService.getConversationContext(jid);
+    const context = await dbService.getConversationContext(normalizedJid);
     
     // Mark conversation as completed
-    await dbService.markConversationCompleted(jid);
+    await dbService.markConversationCompleted(normalizedJid);
     
     // Create appointment record
-    await dbService.createAppointment(jid, context?.clientName || 'Unknown', time);
+    await dbService.createAppointment(normalizedJid, context?.clientName || 'Unknown', time);
     
     // Create calendar event
     try {
@@ -115,11 +122,13 @@ async function createCalendarEvent(time: string, barberName?: string) {
 }
 
 export async function getConversationContext(jid: string): Promise<ConversationContext | null> {
-  return await dbService.getConversationContext(jid);
+  const normalizedJid = normalizeJid(jid);
+  return await dbService.getConversationContext(normalizedJid);
 }
 
 export async function isConversationCompleted(jid: string): Promise<boolean> {
-  return await dbService.isConversationCompleted(jid);
+  const normalizedJid = normalizeJid(jid);
+  return await dbService.isConversationCompleted(normalizedJid);
 }
 
 export async function getAllActiveConversations(): Promise<string[]> {

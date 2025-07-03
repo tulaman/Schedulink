@@ -8,6 +8,26 @@ export interface IncomingWaMessage {
   text: string;
 }
 
+// Utility function to normalize JID format
+export function normalizeJid(jid: string): string {
+  if (!jid || typeof jid !== 'string') {
+    throw new Error('Invalid JID: JID must be a non-empty string');
+  }
+  
+  // If already formatted, return as is
+  if (jid.includes('@')) {
+    return jid;
+  }
+  
+  // Remove any non-digit characters and ensure it's a valid phone number
+  const phoneNumber = jid.replace(/[^\d]/g, '');
+  if (phoneNumber.length < 10) {
+    throw new Error('Invalid phone number: must be at least 10 digits');
+  }
+  
+  return `${phoneNumber}@s.whatsapp.net`;
+}
+
 const waEventBus = new EventEmitter();
 
 export function onWaMessage(handler: (msg: IncomingWaMessage) => void) {
@@ -28,7 +48,8 @@ export async function initWhatsApp(onQR: (qrImage: Buffer) => Promise<void>) {
       for (const msg of messages) {
         if (msg.key.fromMe) continue; // ignore our own messages
         
-        const jid = msg.key.remoteJid as string;
+        const rawJid = msg.key.remoteJid as string;
+        const normalizedJid = normalizeJid(rawJid);
         const text =
           msg.message?.conversation ||
           msg.message?.extendedTextMessage?.text ||
@@ -36,19 +57,19 @@ export async function initWhatsApp(onQR: (qrImage: Buffer) => Promise<void>) {
         
         if (text) {
           // Emit the message for other handlers
-          waEventBus.emit('message', { jid, text } as IncomingWaMessage);
+          waEventBus.emit('message', { jid: normalizedJid, text } as IncomingWaMessage);
           
-          // Check if we have an active conversation with this barber
-          const conversationContext = await getConversationContext(jid);
+          // Check if we have an active conversation with this barber using normalized JID
+          const conversationContext = await getConversationContext(normalizedJid);
           if (conversationContext && !conversationContext.isCompleted) {
             try {
-              console.log(`📨 Received message from barber ${jid}: "${text}"`);
-              const response = await continueConversationWithBarber(jid, text);
+              console.log(`📨 Received message from barber ${normalizedJid}: "${text}"`);
+              const response = await continueConversationWithBarber(normalizedJid, text);
               console.log(`🤖 Agent response: "${response}"`);
               
               // Send the agent's response
-              await sendWaMessage(jid, response);
-              console.log(`✅ Response sent to barber ${jid}`);
+              await sendWaMessage(normalizedJid, response);
+              console.log(`✅ Response sent to barber ${normalizedJid}`);
               
               // Send update to Telegram
               try {
@@ -63,7 +84,7 @@ export async function initWhatsApp(onQR: (qrImage: Buffer) => Promise<void>) {
               }
               
             } catch (error) {
-              console.error(`❌ Error handling message from ${jid}:`, error);
+              console.error(`❌ Error handling message from ${normalizedJid}:`, error);
             }
           }
         }
@@ -101,26 +122,13 @@ export async function initWhatsApp(onQR: (qrImage: Buffer) => Promise<void>) {
 export function sendWaMessage(jid: string, text: string) {
   if (!sock) throw new Error('WhatsApp not initialised');
   
-  // Validate and format JID
-  if (!jid || typeof jid !== 'string') {
-    throw new Error('Invalid JID: JID must be a non-empty string');
-  }
+  // Normalize JID using our utility function
+  const normalizedJid = normalizeJid(jid);
   
-  // Format JID if it's just a phone number
-  let formattedJid = jid;
-  if (!jid.includes('@')) {
-    // Remove any non-digit characters and ensure it's a valid phone number
-    const phoneNumber = jid.replace(/[^\d]/g, '');
-    if (phoneNumber.length < 10) {
-      throw new Error('Invalid phone number: must be at least 10 digits');
-    }
-    formattedJid = `${phoneNumber}@s.whatsapp.net`;
-  }
-  
-  // Validate that the JID has a proper format
-  if (!formattedJid.match(/^.+@(s\.whatsapp\.net|g\.us)$/)) {
+  // Validate that the normalized JID has a proper format
+  if (!normalizedJid.match(/^.+@(s\.whatsapp\.net|g\.us)$/)) {
     throw new Error('Invalid JID format: must end with @s.whatsapp.net or @g.us');
   }
   
-  return sock.sendMessage(formattedJid, { text });
+  return sock.sendMessage(normalizedJid, { text });
 }

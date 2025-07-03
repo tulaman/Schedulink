@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { ConversationContext } from '../agents/barberAgent';
+import { normalizeJid } from '../whatsapp/index';
 
 // For now, let's use any types until Prisma client is generated
 type PrismaConversationLog = any;
@@ -24,6 +25,9 @@ class DatabaseService {
     try {
       await prisma.$connect();
       console.log('✅ Database connected');
+      
+      // Run JID normalization migration
+      await this.migrateJidsToNormalizedFormat();
     } catch (error) {
       console.error('❌ Database connection failed:', error);
       throw error;
@@ -239,6 +243,79 @@ class DatabaseService {
     });
 
     return incompleteConversations.map((conv: any) => conv.barber.jid);
+  }
+
+  // Migration function to normalize existing JIDs
+  async migrateJidsToNormalizedFormat(): Promise<void> {
+    console.log('🔄 Starting JID normalization migration...');
+    
+    try {
+      // Get all barbers with potentially unnormalized JIDs
+      const barbers = await prisma.barber.findMany();
+      
+      if (barbers.length === 0) {
+        console.log('📄 No barbers found, skipping migration');
+        return;
+      }
+      
+      for (const barber of barbers) {
+        try {
+          // Import normalizeJid locally to avoid circular dependency
+          const { normalizeJid } = await import('../whatsapp/index');
+          const normalizedJid = normalizeJid(barber.jid);
+          
+          // If JID was normalized (changed), update it
+          if (normalizedJid !== barber.jid) {
+            console.log(`📝 Normalizing JID: ${barber.jid} → ${normalizedJid}`);
+            
+            // Check if a barber with normalized JID already exists
+            const existingBarber = await prisma.barber.findUnique({
+              where: { jid: normalizedJid }
+            });
+            
+            if (existingBarber) {
+              // Merge the records - transfer all conversation logs and appointments to the existing normalized barber
+              console.log(`⚠️  Merging duplicate barber records for ${normalizedJid}`);
+              
+              // Update conversation logs
+              await prisma.conversationLog.updateMany({
+                where: { barberId: barber.id },
+                data: { barberId: existingBarber.id }
+              });
+              
+              // Update appointments
+              await prisma.appointment.updateMany({
+                where: { barberId: barber.id },
+                data: { barberId: existingBarber.id }
+              });
+              
+              // Delete the old barber record
+              await prisma.barber.delete({
+                where: { id: barber.id }
+              });
+              
+              console.log(`✅ Merged and deleted old barber record for ${barber.jid}`);
+            } else {
+              // Simply update the JID
+              await prisma.barber.update({
+                where: { id: barber.id },
+                data: { jid: normalizedJid }
+              });
+              
+              console.log(`✅ Updated JID for barber ${barber.id}`);
+            }
+          }
+        } catch (error) {
+          console.error(`❌ Failed to normalize JID for barber ${barber.jid}:`, error);
+          // Continue with other barbers even if one fails
+        }
+      }
+      
+      console.log('✅ JID normalization migration completed successfully');
+    } catch (error) {
+      console.error('❌ JID normalization migration failed:', error);
+      // Don't throw error to prevent startup failure - just log and continue
+    }
   }
 }
 
