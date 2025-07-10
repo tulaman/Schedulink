@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(sqlite3:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pkill:*)",
+      "Bash(rg:*)",
+      "Bash(pnpm test:*)"
+    ],
+    "deny": []
+  }
+}

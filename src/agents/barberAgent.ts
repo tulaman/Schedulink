@@ -2,7 +2,7 @@ import { Agent, run } from '@openai/agents';
 import { createCalEvent } from '../calendar/google';
 import dbService from '../database/service';
 import { normalizeJid } from '../whatsapp/index';
-import { sendTelegramNotification } from '../telegram/bot';
+import { sendTelegramNotification } from '../telegram/multiuser-bot';
 import { TimeoutManager } from '../timeout/manager';
 
 export interface ConversationContext {
@@ -35,7 +35,8 @@ HEDEF: Müşteri için uygun bir saatte saç kesimi randevusu almak.
 export async function startConversationWithBarber(
   jid: string, 
   clientName: string, 
-  barberName?: string
+  barberName: string | undefined,
+  userId: string // Add userId parameter
 ): Promise<string> {
   // Normalize JID to ensure consistency
   const normalizedJid = normalizeJid(jid);
@@ -47,30 +48,31 @@ export async function startConversationWithBarber(
   const result = await run(barberAgent, initialPrompt);
   const message = result.finalOutput || 'Hata oluştu';
   
-  // Save conversation context (client and barber info) with normalized JID
-  await dbService.saveConversationContext(normalizedJid, clientName, barberName);
+  // Save conversation context (client and barber info) with normalized JID and userId
+  await dbService.saveConversationContext(normalizedJid, clientName, userId, barberName);
   
-  // Save initial message to database with normalized JID
-  await dbService.saveConversationMessage(normalizedJid, message, 'sent');
+  // Save initial message to database with normalized JID and userId
+  await dbService.saveConversationMessage(normalizedJid, message, 'sent', userId);
   
   // Start timeout tracking for the initial message
-  await TimeoutManager.startTimeout(normalizedJid);
+  await TimeoutManager.startTimeout(normalizedJid, userId);
   
   return message;
 }
 
 export async function continueConversationWithBarber(
   jid: string,
-  barberMessage: string
+  barberMessage: string,
+  userId: string // Add userId parameter
 ): Promise<string> {
   // Normalize JID to ensure consistency
   const normalizedJid = normalizeJid(jid);
   
   // Save the received message from barber
-  await dbService.saveConversationMessage(normalizedJid, barberMessage, 'received');
+  await dbService.saveConversationMessage(normalizedJid, barberMessage, 'received', userId);
   
   // Clear awaiting reply status since barber responded
-  await dbService.clearAwaitingReply(normalizedJid);
+  await dbService.clearAwaitingReply(normalizedJid, userId);
   
   const userPrompt = `Berber şöyle cevap verdi: "${barberMessage}"\n\nBu mesaja uygun şekilde cevap ver. Eğer saat önerdi ve uygunsa onayla ve randevuyu kesinleştir. Eğer randevu kesinleştiyse mesajın sonuna [CONFIRMED:HH:MM] formatında ekle.`;
   
@@ -79,19 +81,19 @@ export async function continueConversationWithBarber(
   const response = result.finalOutput || 'Hata oluştu';
   
   // Save our response
-  await dbService.saveConversationMessage(normalizedJid, response, 'sent');
+  await dbService.saveConversationMessage(normalizedJid, response, 'sent', userId);
   
   // Check if appointment was confirmed
   const confirmedMatch = response.match(/\[CONFIRMED:(\d{1,2}:\d{2})\]/);
   if (confirmedMatch) {
     const time = confirmedMatch[1];
-    const context = await dbService.getConversationContext(normalizedJid);
+    const context = await dbService.getConversationContext(normalizedJid, userId);
     
     // Mark conversation as completed
-    await dbService.markConversationCompleted(normalizedJid);
+    await dbService.markConversationCompleted(normalizedJid, userId);
     
     // Create appointment record
-    await dbService.createAppointment(normalizedJid, context?.clientName || 'Unknown', time);
+    await dbService.createAppointment(normalizedJid, context?.clientName || 'Unknown', time, userId);
     
     // Create calendar event
     try {
@@ -107,7 +109,7 @@ export async function continueConversationWithBarber(
       const clientName = context?.clientName || 'вас';
       const notificationMessage = `🎉 Отлично! Запись подтверждена!\n\n📅 Время: ${time}\n👨‍💼 Барбер: ${barberName}\n👤 Клиент: ${clientName}\n\n✅ Встреча добавлена в ваш календарь Google.`;
       
-      await sendTelegramNotification(notificationMessage);
+      await sendTelegramNotification(notificationMessage, userId);
     } catch (error) {
       console.error('Failed to send Telegram notification:', error);
     }
@@ -140,16 +142,16 @@ async function createCalendarEvent(time: string, barberName?: string) {
   }
 }
 
-export async function getConversationContext(jid: string): Promise<ConversationContext | null> {
+export async function getConversationContext(jid: string, userId: string): Promise<ConversationContext | null> {
   const normalizedJid = normalizeJid(jid);
-  return await dbService.getConversationContext(normalizedJid);
+  return await dbService.getConversationContext(normalizedJid, userId);
 }
 
-export async function isConversationCompleted(jid: string): Promise<boolean> {
+export async function isConversationCompleted(jid: string, userId: string): Promise<boolean> {
   const normalizedJid = normalizeJid(jid);
-  return await dbService.isConversationCompleted(normalizedJid);
+  return await dbService.isConversationCompleted(normalizedJid, userId);
 }
 
-export async function getAllActiveConversations(): Promise<string[]> {
-  return await dbService.getActiveConversations();
+export async function getAllActiveConversations(userId: string): Promise<string[]> {
+  return await dbService.getActiveConversations(userId);
 } 
