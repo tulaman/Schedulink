@@ -13,14 +13,45 @@ datasource db {
 model User {
   id String @id @default(cuid())
   telegramChatId String @unique
+  telegramUsername String?
   name String
+  isActive Boolean @default(true)
+  onboardingCompleted Boolean @default(false)
+  language String @default("ru") // ru, en, tr
+  timezone String @default("UTC")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
+  // User preferences
+  preferences UserPreferences?
+  
+  // User's data
   appointments Appointment[]
   conversationLogs ConversationLog[]
+  userBarbers UserBarber[] // User's personal barbers
   
   @@map("users")
+}
+
+model UserPreferences {
+  id String @id @default(cuid())
+  userId String @unique
+  
+  // Notification settings
+  notifyOnConfirmation Boolean @default(true)
+  notifyOnTimeout Boolean @default(true)
+  
+  // Default appointment preferences
+  defaultAppointmentDuration Int @default(60) // minutes
+  reminderMinutesBefore Int @default(30)
+  
+  // Calendar settings
+  googleCalendarEnabled Boolean @default(false)
+  googleCalendarId String?
+  
+  user User @relation(fields: [userId], references: [id])
+  
+  @@map("user_preferences")
 }
 
 model Barber {
@@ -31,16 +62,39 @@ model Barber {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
+  // Relations
   appointments Appointment[]
   conversationLogs ConversationLog[]
+  userBarbers UserBarber[] // Which users know this barber
   
   @@map("barbers")
 }
 
+// Junction table for user-barber relationships
+model UserBarber {
+  id String @id @default(cuid())
+  userId String
+  barberId String
+  
+  // User-specific barber info
+  nickname String? // User's personal name for barber
+  notes String?
+  isFavorite Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  user User @relation(fields: [userId], references: [id])
+  barber Barber @relation(fields: [barberId], references: [id])
+  
+  @@unique([userId, barberId])
+  @@map("user_barbers")
+}
+
 model ConversationLog {
   id String @id @default(cuid())
+  userId String // Now required!
   barberId String
-  userId String?
   messageText String
   messageType String // 'sent' | 'received' | 'system'
   timestamp DateTime @default(now())
@@ -50,26 +104,31 @@ model ConversationLog {
   reminderSentAt DateTime? // When reminder was sent
   escalatedAt DateTime? // When escalated to Telegram
   
+  user User @relation(fields: [userId], references: [id])
   barber Barber @relation(fields: [barberId], references: [id])
-  user User? @relation(fields: [userId], references: [id])
   
   @@map("conversation_logs")
 }
 
 model Appointment {
   id String @id @default(cuid())
+  userId String // Now required!
   barberId String
-  userId String?
   clientName String
   appointmentTime String
   appointmentDate DateTime?
   status String @default("pending") // 'pending' | 'confirmed' | 'cancelled'
   calendarEventId String?
+  
+  // Additional fields for multi-user
+  duration Int @default(60) // minutes
+  notes String?
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
+  user User @relation(fields: [userId], references: [id])
   barber Barber @relation(fields: [barberId], references: [id])
-  user User? @relation(fields: [userId], references: [id])
   
   @@map("appointments")
 }

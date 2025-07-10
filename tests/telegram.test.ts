@@ -1,5 +1,5 @@
 import { Telegraf } from 'telegraf';
-import { createBot, sendTelegramNotification } from '../src/telegram/bot';
+import { createMultiUserBot, sendTelegramNotification } from '../src/telegram/multiuser-bot';
 import fs from 'fs/promises';
 
 jest.mock('telegraf');
@@ -26,7 +26,7 @@ describe('Telegram Bot Tests', () => {
       } as any;
     });
     process.env.TELEGRAM_BOT_TOKEN = 'test';
-    createBot();
+    createMultiUserBot();
     expect(reply).toHaveBeenCalledWith('pong');
   });
 
@@ -46,7 +46,7 @@ describe('Telegram Bot Tests', () => {
       fsMock.readFile.mockResolvedValue('123456789');
 
       process.env.TELEGRAM_BOT_TOKEN = 'test-token';
-      createBot();
+      createMultiUserBot();
 
       const testMessage = '🎉 Запись подтверждена! Время: 15:00';
       await sendTelegramNotification(testMessage);
@@ -69,7 +69,7 @@ describe('Telegram Bot Tests', () => {
       fsMock.readFile.mockRejectedValue(new Error('File not found'));
 
       process.env.TELEGRAM_BOT_TOKEN = 'test-token';
-      createBot();
+      createMultiUserBot();
 
       const testMessage = '🎉 Запись подтверждена! Время: 15:00';
       await sendTelegramNotification(testMessage);
@@ -92,7 +92,7 @@ describe('Telegram Bot Tests', () => {
       fsMock.readFile.mockResolvedValue('123456789');
 
       process.env.TELEGRAM_BOT_TOKEN = 'test-token';
-      createBot();
+      createMultiUserBot();
 
       const testMessage = '🎉 Запись подтверждена! Время: 15:00';
       

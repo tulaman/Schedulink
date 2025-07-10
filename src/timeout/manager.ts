@@ -1,11 +1,12 @@
 import dbService from '../database/service';
 import { sendHumanLike } from '../whatsapp/index';
-import { sendTelegramNotification } from '../telegram/bot';
+import { sendTelegramNotification } from '../telegram/multiuser-bot';
 
-// Map to store active timeouts: JID -> { reminderTimeout, escalationTimeout }
+// Map to store active timeouts: JID+userId -> { reminderTimeout, escalationTimeout, userId }
 const activeTimeouts = new Map<string, {
   reminderTimeout?: NodeJS.Timeout;
   escalationTimeout?: NodeJS.Timeout;
+  userId: string;
 }>();
 
 // Timeout constants (in milliseconds)
@@ -16,39 +17,45 @@ export class TimeoutManager {
   /**
    * Start timeout tracking for a sent message
    * @param jid WhatsApp JID of the barber
+   * @param userId User ID for isolation
    */
-  static async startTimeout(jid: string): Promise<void> {
-    // Clear any existing timeouts for this JID
-    this.clearTimeout(jid);
+  static async startTimeout(jid: string, userId: string): Promise<void> {
+    const timeoutKey = `${jid}:${userId}`;
     
-    console.log(`⏰ Starting timeout tracking for ${jid}`);
+    // Clear any existing timeouts for this JID+userId
+    this.clearTimeout(jid, userId);
+    
+    console.log(`⏰ Starting timeout tracking for ${jid} (user: ${userId})`);
     
     // Set reminder timeout (10 minutes)
     const reminderTimeout = setTimeout(async () => {
-      await this.handleReminder(jid);
+      await this.handleReminder(jid, userId);
     }, REMINDER_DELAY);
     
     // Set escalation timeout (20 minutes)
     const escalationTimeout = setTimeout(async () => {
-      await this.handleEscalation(jid);
+      await this.handleEscalation(jid, userId);
     }, ESCALATION_DELAY);
     
     // Store timeouts
-    activeTimeouts.set(jid, {
+    activeTimeouts.set(timeoutKey, {
       reminderTimeout,
-      escalationTimeout
+      escalationTimeout,
+      userId
     });
     
     // Update database to mark as awaiting reply
-    await dbService.markAwaitingReply(jid);
+    await dbService.markAwaitingReply(jid, userId);
   }
   
   /**
    * Clear timeout when barber replies
    * @param jid WhatsApp JID of the barber
+   * @param userId User ID for isolation
    */
-  static clearTimeout(jid: string): void {
-    const timeouts = activeTimeouts.get(jid);
+  static clearTimeout(jid: string, userId: string): void {
+    const timeoutKey = `${jid}:${userId}`;
+    const timeouts = activeTimeouts.get(timeoutKey);
     if (timeouts) {
       if (timeouts.reminderTimeout) {
         clearTimeout(timeouts.reminderTimeout);
@@ -56,24 +63,25 @@ export class TimeoutManager {
       if (timeouts.escalationTimeout) {
         clearTimeout(timeouts.escalationTimeout);
       }
-      activeTimeouts.delete(jid);
-      console.log(`✅ Timeout cleared for ${jid}`);
+      activeTimeouts.delete(timeoutKey);
+      console.log(`✅ Timeout cleared for ${jid} (user: ${userId})`);
     }
   }
   
   /**
    * Handle reminder after 10 minutes of no response
    * @param jid WhatsApp JID of the barber
+   * @param userId User ID for isolation
    */
-  private static async handleReminder(jid: string): Promise<void> {
+  private static async handleReminder(jid: string, userId: string): Promise<void> {
     try {
-      console.log(`⏰ Sending reminder to ${jid} after 10 minutes of no response`);
+      console.log(`⏰ Sending reminder to ${jid} after 10 minutes of no response (user: ${userId})`);
       
       // Check if still awaiting reply (conversation might have been completed)
-      const context = await dbService.getConversationContext(jid);
+      const context = await dbService.getConversationContext(jid, userId);
       if (!context || context.isCompleted) {
         console.log(`ℹ️ Conversation with ${jid} already completed, skipping reminder`);
-        this.clearTimeout(jid);
+        this.clearTimeout(jid, userId);
         return;
       }
       
@@ -82,7 +90,7 @@ export class TimeoutManager {
       await sendHumanLike(jid, reminderMessage);
       
       // Update database
-      await dbService.markReminderSent(jid);
+      await dbService.markReminderSent(jid, userId);
       
       console.log(`📤 Reminder sent to ${jid}`);
       
@@ -90,7 +98,8 @@ export class TimeoutManager {
       const barberName = context?.barberName || 'Барбер';
       const clientName = context?.clientName || 'клиент';
       await sendTelegramNotification(
-        `⏰ Напоминание отправлено!\n\n👨‍💼 Барбер: ${barberName}\n👤 Клиент: ${clientName}\n\n⌛ Барбер не отвечает уже 10 минут. Отправлено напоминание.`
+        `⏰ Напоминание отправлено!\n\n👨‍💼 Барбер: ${barberName}\n👤 Клиент: ${clientName}\n\n⌛ Барбер не отвечает уже 10 минут. Отправлено напоминание.`,
+        userId
       );
       
     } catch (error) {
@@ -101,21 +110,22 @@ export class TimeoutManager {
   /**
    * Handle escalation after 20 minutes of no response
    * @param jid WhatsApp JID of the barber
+   * @param userId User ID for isolation
    */
-  private static async handleEscalation(jid: string): Promise<void> {
+  private static async handleEscalation(jid: string, userId: string): Promise<void> {
     try {
-      console.log(`🚨 Escalating conversation with ${jid} after 20 minutes of no response`);
+      console.log(`🚨 Escalating conversation with ${jid} after 20 minutes of no response (user: ${userId})`);
       
       // Check if still awaiting reply
-      const context = await dbService.getConversationContext(jid);
+      const context = await dbService.getConversationContext(jid, userId);
       if (!context || context.isCompleted) {
         console.log(`ℹ️ Conversation with ${jid} already completed, skipping escalation`);
-        this.clearTimeout(jid);
+        this.clearTimeout(jid, userId);
         return;
       }
       
       // Update database
-      await dbService.markEscalated(jid);
+      await dbService.markEscalated(jid, userId);
       
       // Send escalation notification to Telegram
       const barberName = context?.barberName || 'Неизвестный барбер';
@@ -124,10 +134,10 @@ export class TimeoutManager {
       
       const escalationMessage = `🚨 ЭСКАЛАЦИЯ: Барбер не отвечает!\n\n👨‍💼 Барбер: ${barberName}\n📱 Телефон: +${barberPhone}\n👤 Клиент: ${clientName}\n\n⌛ Прошло 20 минут без ответа. Возможно, нужно связаться с барбером другим способом или попробовать другого барбера.\n\n💡 Используйте /wa ${barberPhone} <сообщение> для прямой отправки сообщения.`;
       
-      await sendTelegramNotification(escalationMessage);
+      await sendTelegramNotification(escalationMessage, userId);
       
       // Clear timeout as it's now escalated
-      this.clearTimeout(jid);
+      this.clearTimeout(jid, userId);
       
       console.log(`🚨 Escalation completed for ${jid}`);
       
@@ -147,9 +157,15 @@ export class TimeoutManager {
    * Clear all timeouts (for shutdown)
    */
   static clearAllTimeouts(): void {
-    for (const [jid] of activeTimeouts) {
-      this.clearTimeout(jid);
+    for (const [key, timeouts] of activeTimeouts) {
+      if (timeouts.reminderTimeout) {
+        clearTimeout(timeouts.reminderTimeout);
+      }
+      if (timeouts.escalationTimeout) {
+        clearTimeout(timeouts.escalationTimeout);
+      }
     }
+    activeTimeouts.clear();
     console.log(`🧹 All timeouts cleared`);
   }
 } 

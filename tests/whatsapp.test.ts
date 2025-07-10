@@ -1,5 +1,5 @@
 import { Telegraf } from 'telegraf';
-import { createBot } from '../src/telegram/bot';
+import { createMultiUserBot } from '../src/telegram/multiuser-bot';
 import fs from 'fs/promises';
 
 jest.mock('telegraf');
@@ -48,7 +48,7 @@ describe('Telegram Bot WhatsApp Integration', () => {
     });
     
     process.env.TELEGRAM_BOT_TOKEN = 't';
-    createBot();
+    createMultiUserBot();
     await handlerPromise;
     await Promise.resolve();
     
@@ -78,7 +78,7 @@ describe('Telegram Bot WhatsApp Integration', () => {
     });
     
     process.env.TELEGRAM_BOT_TOKEN = 't';
-    createBot();
+    createMultiUserBot();
     await handlerPromise;
     await Promise.resolve();
     
@@ -107,7 +107,7 @@ describe('Telegram Bot WhatsApp Integration', () => {
     });
     
     process.env.TELEGRAM_BOT_TOKEN = 't';
-    createBot();
+    createMultiUserBot();
     await handlerPromise;
     await Promise.resolve();
     
@@ -135,7 +135,7 @@ describe('Telegram Bot WhatsApp Integration', () => {
     });
     
     process.env.TELEGRAM_BOT_TOKEN = 't';
-    createBot();
+    createMultiUserBot();
     await handlerPromise;
     await Promise.resolve();
     

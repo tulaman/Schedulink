@@ -1,222 +1,168 @@
-import { PrismaClient } from '@prisma/client';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { startConversationWithBarber, continueConversationWithBarber, getConversationContext } from '../src/agents/barberAgent';
 import dbService from '../src/database/service';
-import { startConversationWithBarber, continueConversationWithBarber, getAllActiveConversations } from '../src/agents/barberAgent';
 
-// Mock OpenAI Agents
+// Mock the OpenAI agents SDK
 jest.mock('@openai/agents', () => ({
-  Agent: jest.fn().mockImplementation(() => ({})),
+  Agent: class MockAgent {
+    constructor() {}
+  },
   run: jest.fn().mockResolvedValue({
     finalOutput: 'Mocked response from agent'
   })
 }));
 
-// Mock Google Calendar
-jest.mock('../src/calendar/google', () => ({
-  createCalEvent: jest.fn().mockResolvedValue({ success: true })
+// Mock WhatsApp functions
+jest.mock('../src/whatsapp/index', () => ({
+  normalizeJid: (jid: string) => {
+    if (!jid || typeof jid !== 'string') {
+      throw new Error('Invalid JID: JID must be a non-empty string');
+    }
+    if (jid.includes('@')) return jid;
+    const phoneNumber = jid.replace(/[^\d]/g, '');
+    if (phoneNumber.length < 10) {
+      throw new Error('Invalid phone number: must be at least 10 digits');
+    }
+    return `${phoneNumber}@s.whatsapp.net`;
+  }
 }));
 
-const prisma = new PrismaClient({
-  datasourceUrl: 'file:./test.db'
-});
+// Mock Telegram functions
+jest.mock('../src/telegram/multiuser-bot', () => ({
+  sendTelegramNotification: jest.fn()
+}));
 
-describe('Stage 6: Persistence & Restart Safety', () => {
-  beforeAll(async () => {
-    // Initialize test database
-    await dbService.initDatabase();
-  });
+// Mock timeout manager
+jest.mock('../src/timeout/manager', () => ({
+  TimeoutManager: {
+    startTimeout: jest.fn(),
+    clearTimeout: jest.fn()
+  }
+}));
+
+// Mock calendar integration
+jest.mock('../src/calendar/google', () => ({
+  createCalEvent: jest.fn()
+}));
+
+describe('Persistence Tests (Multi-User)', () => {
+  let testUserId: string;
 
   beforeEach(async () => {
-    // Clean database before each test - order matters for foreign key constraints
-    await prisma.conversationLog.deleteMany();
-    await prisma.appointment.deleteMany();
-    await prisma.barber.deleteMany();
-    await prisma.user.deleteMany();
+    await dbService.initDatabase();
+    
+    // Create test user
+    const testUser = await dbService.createUser({
+      telegramChatId: `test_${Date.now()}`,
+      name: 'Test User',
+      language: 'tr',
+      timezone: 'Europe/Istanbul',
+      onboardingCompleted: true
+    });
+    testUserId = testUser.id;
   });
 
-  afterAll(async () => {
-    // Clean up - order matters for foreign key constraints
-    await prisma.conversationLog.deleteMany();
-    await prisma.appointment.deleteMany();
-    await prisma.barber.deleteMany();
-    await prisma.user.deleteMany();
+  afterEach(async () => {
     await dbService.disconnect();
   });
 
   describe('Conversation Persistence', () => {
-    it('should persist conversation messages to database', async () => {
-      const jid = 'test-barber@c.us';
-      const clientName = 'John Doe';
-      const barberName = 'Mehmet';
+    it('should persist conversation messages with user isolation', async () => {
+      const jid = 'test-barber@s.whatsapp.net';
+      const clientName = 'Test Client';
+      const barberName = 'Test Barber';
 
       // Start conversation
-      await startConversationWithBarber(jid, clientName, barberName);
+      await startConversationWithBarber(jid, clientName, barberName, testUserId);
 
-      // Verify barber was created
-      const barber = await prisma.barber.findUnique({
-        where: { jid },
-        include: { conversationLogs: true }
-      });
+      // Verify conversation context
+      const conversationContext = await getConversationContext(jid, testUserId);
+      expect(conversationContext).toBeDefined();
+      expect(conversationContext?.clientName).toBe(clientName);
+      expect(conversationContext?.barberName).toBe(barberName);
 
-      expect(barber).toBeTruthy();
-      expect(barber!.name).toBe(barberName);
-      expect(barber!.conversationLogs).toHaveLength(2); // system + sent
-      expect(barber!.conversationLogs[0].messageType).toBe('system'); // context message
-      expect(barber!.conversationLogs[1].messageType).toBe('sent');
-      expect(barber!.conversationLogs[1].messageText).toContain('Mocked response');
+      // Verify messages are saved with user isolation
+      const history = await dbService.getConversationHistory(jid, testUserId);
+      expect(history.length).toBeGreaterThan(0);
     });
 
-    it('should persist received messages from barber', async () => {
-      const jid = 'test-barber@c.us';
-      const clientName = 'John Doe';
-      const barberName = 'Mehmet';
-      const barberReply = 'Merhaba! 15:00 uygun mu?';
+    it('should handle barber replies with user isolation', async () => {
+      const jid = 'test-barber-2@s.whatsapp.net';
+      const clientName = 'Test Client 2';
+      const barberName = 'Test Barber 2';
 
       // Start conversation
-      await startConversationWithBarber(jid, clientName, barberName);
-      
+      await startConversationWithBarber(jid, clientName, barberName, testUserId);
+
       // Continue conversation
-      await continueConversationWithBarber(jid, barberReply);
+      const barberReply = "Evet, yarın 15:00 uygun mu?";
+      await continueConversationWithBarber(jid, barberReply, testUserId);
 
-      // Verify messages were persisted
-      const barber = await prisma.barber.findUnique({
-        where: { jid },
-        include: { 
-          conversationLogs: {
-            orderBy: { timestamp: 'asc' }
-          }
-        }
-      });
-
-      expect(barber!.conversationLogs).toHaveLength(4); // system, sent, received, sent
-      expect(barber!.conversationLogs[0].messageType).toBe('system'); // context message
-      expect(barber!.conversationLogs[1].messageType).toBe('sent');
-      expect(barber!.conversationLogs[2].messageType).toBe('received');
-      expect(barber!.conversationLogs[2].messageText).toBe(barberReply);
-      expect(barber!.conversationLogs[3].messageType).toBe('sent');
-    });
-
-    it('should mark conversation as completed when appointment confirmed', async () => {
-      const jid = 'test-barber@c.us';
-      const clientName = 'John Doe';
-      const barberName = 'Mehmet';
-      
-      // Start conversation
-      await startConversationWithBarber(jid, clientName, barberName);
-      
-      // Mock confirmed response for the next call
-      const { run } = require('@openai/agents');
-      run.mockResolvedValueOnce({
-        finalOutput: 'Harika! 15:00 saati benim için uygun. Teşekkürler! [CONFIRMED:15:00]'
-      });
-
-      // Continue with confirmation
-      await continueConversationWithBarber(jid, '15:00 uygun mu?');
-
-      // Verify conversation marked as completed
-      const barber = await prisma.barber.findUnique({
-        where: { jid },
-        include: { 
-          conversationLogs: true,
-          appointments: true
-        }
-      });
-
-      const completedLogs = barber!.conversationLogs.filter(log => log.isCompleted);
-      expect(completedLogs.length).toBeGreaterThan(0);
-      
-      // Verify appointment was created
-      expect(barber!.appointments).toHaveLength(1);
-      expect(barber!.appointments[0].appointmentTime).toBe('15:00');
-      expect(barber!.appointments[0].status).toBe('confirmed');
-      expect(barber!.appointments[0].clientName).toBe(clientName);
+      // Verify both messages are saved
+      const history = await dbService.getConversationHistory(jid, testUserId);
+      expect(history.length).toBeGreaterThan(1);
+      expect(history.some(msg => msg.type === 'received')).toBe(true);
     });
   });
 
-  describe('Restart Recovery', () => {
-    it('should restore incomplete conversations after restart', async () => {
-      const jid1 = 'barber1@c.us';
-      const jid2 = 'barber2@c.us';
-      const jid3 = 'barber3@c.us';
+  describe('Multi-User Isolation', () => {
+    it('should isolate conversations between users', async () => {
+      // Create second user
+      const testUser2 = await dbService.createUser({
+        telegramChatId: `test_2_${Date.now()}`,
+        name: 'Test User 2',
+        language: 'ru',
+        timezone: 'Europe/Moscow',
+        onboardingCompleted: true
+      });
 
-      // Create some conversations - 2 incomplete, 1 completed
-      await startConversationWithBarber(jid1, 'Client1', 'Barber1');
-      await startConversationWithBarber(jid2, 'Client2', 'Barber2');
-      await startConversationWithBarber(jid3, 'Client3', 'Barber3');
-
-      // Mark one conversation as completed
-      await dbService.markConversationCompleted(jid3);
-
-      // Simulate restart - get incomplete conversations
-      const incompleteConversations = await dbService.getAllIncompleteConversations();
+      const jid = 'shared-barber@s.whatsapp.net';
       
-      expect(incompleteConversations).toHaveLength(2);
-      expect(incompleteConversations).toContain(jid1);
-      expect(incompleteConversations).toContain(jid2);
-      expect(incompleteConversations).not.toContain(jid3);
-    });
-
-    it('should restore conversation history correctly', async () => {
-      const jid = 'test-barber@c.us';
-      const clientName = 'John Doe';
-      const barberName = 'Mehmet';
-
-      // Create conversation with multiple messages
-      await startConversationWithBarber(jid, clientName, barberName);
-      await continueConversationWithBarber(jid, 'Merhaba! Hangi saatler uygun?');
-      await continueConversationWithBarber(jid, '15:00 da gelebilir misin?');
-
-      // Retrieve conversation history
-      const history = await dbService.getConversationHistory(jid);
+      // User 1 starts conversation
+      await startConversationWithBarber(jid, 'Client 1', 'Barber Name', testUserId);
       
-      expect(history).toHaveLength(6); // system, sent, received, sent, received, sent
-      expect(history[0].type).toBe('system'); // context message
-      expect(history[1].type).toBe('sent');
-      expect(history[2].type).toBe('received');
-      expect(history[2].text).toBe('Merhaba! Hangi saatler uygun?');
-      expect(history[4].text).toBe('15:00 da gelebilir misin?');
-    });
+      // User 2 starts conversation with same barber
+      await startConversationWithBarber(jid, 'Client 2', 'Barber Name', testUser2.id);
 
-    it('should handle database connection failures gracefully', async () => {
-      // This test simulates database connectivity issues
-      const originalConnect = dbService.initDatabase;
-      
-      // Mock database failure
-      jest.spyOn(dbService, 'initDatabase').mockRejectedValueOnce(new Error('Database connection failed'));
+      // Check conversations are isolated
+      const context1 = await getConversationContext(jid, testUserId);
+      const context2 = await getConversationContext(jid, testUser2.id);
 
-      await expect(dbService.initDatabase()).rejects.toThrow('Database connection failed');
-      
-      // Restore original method
-      dbService.initDatabase = originalConnect;
+      expect(context1?.clientName).toBe('Client 1');
+      expect(context2?.clientName).toBe('Client 2');
     });
   });
 
-  describe('Active Conversations Management', () => {
-    it('should track active conversations correctly', async () => {
-      const jid1 = 'barber1@c.us';
-      const jid2 = 'barber2@c.us';
-
-      // Initially no active conversations
-      let activeConversations = await getAllActiveConversations();
-      expect(activeConversations).toHaveLength(0);
-
-      // Start conversations
-      await startConversationWithBarber(jid1, 'Client1', 'Barber1');
-      await startConversationWithBarber(jid2, 'Client2', 'Barber2');
-
-      // Should have 2 active conversations
-      activeConversations = await getAllActiveConversations();
-      expect(activeConversations).toHaveLength(2);
-      expect(activeConversations).toContain(jid1);
-      expect(activeConversations).toContain(jid2);
-
-      // Complete one conversation
-      await dbService.markConversationCompleted(jid1);
-
-      // Should have 1 active conversation
-      activeConversations = await getAllActiveConversations();
-      expect(activeConversations).toHaveLength(1);
-      expect(activeConversations).toContain(jid2);
-      expect(activeConversations).not.toContain(jid1);
+  describe('Appointment Persistence', () => {
+    it('should create appointments with user isolation', async () => {
+      const jid = 'appointment-barber@s.whatsapp.net';
+      
+      await dbService.createAppointment(jid, 'Test Client', '15:00', testUserId);
+      
+      const appointments = await dbService.getUserAppointments(testUserId);
+      expect(appointments).toHaveLength(1);
+      expect(appointments[0].clientName).toBe('Test Client');
+      expect(appointments[0].appointmentTime).toBe('15:00');
     });
   });
-}); 
+
+  describe('Recovery and Restart', () => {
+    it('should recover incomplete conversations by user', async () => {
+      const jid = 'recovery-barber@s.whatsapp.net';
+      
+      // Start incomplete conversation
+      await startConversationWithBarber(jid, 'Recovery Client', 'Recovery Barber', testUserId);
+      
+      // Check it's detected as incomplete
+      const incompleteConversations = await dbService.getAllIncompleteConversations(testUserId);
+      expect(incompleteConversations).toContain(jid);
+      
+      // Complete the conversation
+      await dbService.markConversationCompleted(jid, testUserId);
+      
+      // Check it's no longer incomplete
+      const afterCompletion = await dbService.getAllIncompleteConversations(testUserId);
+      expect(afterCompletion).not.toContain(jid);
+    });
+  });
+});

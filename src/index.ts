@@ -1,4 +1,4 @@
-import { createBot } from './telegram/bot.js';
+import { createMultiUserBot } from './telegram/multiuser-bot.js';
 import { initWhatsApp } from './whatsapp/index.js';
 import fs from 'fs/promises';
 import dbService from './database/service.js';
@@ -9,10 +9,10 @@ async function main() {
   try {
     await dbService.initDatabase();
     
-    // Restore incomplete conversations on startup
+    // Restore incomplete conversations on startup (for all users)
     const incompleteConversations = await dbService.getAllIncompleteConversations();
     if (incompleteConversations.length > 0) {
-      console.log(`🔄 Restored ${incompleteConversations.length} incomplete conversations: ${incompleteConversations.join(', ')}`);
+      console.log(`🔄 Found ${incompleteConversations.length} incomplete conversations across all users: ${incompleteConversations.join(', ')}`);
     }
   } catch (error) {
     console.error('Failed to initialize database:', error);
@@ -20,14 +20,8 @@ async function main() {
   }
 
   let qrChatId: number | undefined;
-  try {
-    const chatIdStr = await fs.readFile('telegram_chat_id', 'utf-8');
-    qrChatId = parseInt(chatIdStr, 10);
-  } catch (e) {
-    // ignore
-  }
 
-  const bot = createBot();
+  const bot = createMultiUserBot();
 
   initWhatsApp(async qr => {
     // persist QR so we can send it later on demand
@@ -37,8 +31,6 @@ async function main() {
         await bot.telegram.sendPhoto(qrChatId, { source: qr });
       } catch (err) {
         console.warn('Failed to send QR to saved Telegram chat ID – will require manual /qr.');
-        // remove invalid chat id so we do not keep crashing on next restart
-        await fs.rm('telegram_chat_id', { force: true });
       }
     } else {
       console.log('Scan this QR to login:', qr.toString());

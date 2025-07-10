@@ -2,8 +2,9 @@ import { makeWASocket, useMultiFileAuthState, WASocket } from 'baileys';
 import QRCode from 'qrcode';
 import { EventEmitter } from 'events';
 import { continueConversationWithBarber, getConversationContext } from '../agents/barberAgent';
-import { sendTelegramNotification } from '../telegram/bot';
+import { sendTelegramNotification } from '../telegram/multiuser-bot';
 import { TimeoutManager } from '../timeout/manager';
+import dbService from '../database/service';
 
 export interface IncomingWaMessage {
   jid: string;
@@ -36,6 +37,22 @@ export function onWaMessage(handler: (msg: IncomingWaMessage) => void) {
   waEventBus.on('message', handler);
 }
 
+/**
+ * Find all users who have active (incomplete) conversations with a specific barber
+ * @param barberJid Normalized barber JID
+ * @returns Array of user IDs with active conversations
+ */
+async function findUsersWithActiveConversation(barberJid: string): Promise<string[]> {
+  try {
+    // Query database for all users who have incomplete conversations with this barber
+    const activeConversations = await dbService.getUsersWithActiveConversationForBarber(barberJid);
+    return activeConversations;
+  } catch (error) {
+    console.error(`❌ Failed to find users with active conversations for ${barberJid}:`, error);
+    return [];
+  }
+}
+
 let sock: WASocket | null = null;
 
 export async function initWhatsApp(onQR: (qrImage: Buffer) => Promise<void>) {
@@ -61,17 +78,27 @@ export async function initWhatsApp(onQR: (qrImage: Buffer) => Promise<void>) {
           // Emit the message for other handlers
           waEventBus.emit('message', { jid: normalizedJid, text } as IncomingWaMessage);
           
-          // Check if we have an active conversation with this barber using normalized JID
-          const conversationContext = await getConversationContext(normalizedJid);
-          if (conversationContext && !conversationContext.isCompleted) {
-            try {
-              console.log(`📨 Received message from barber ${normalizedJid}: "${text}"`);
+          // Find all users who have active conversations with this barber
+          // This is needed because we don't know which user the barber is replying to
+          try {
+            // Get all active conversations for this barber across all users
+            const activeUsers = await findUsersWithActiveConversation(normalizedJid);
+            
+            if (activeUsers.length === 0) {
+              console.log(`ℹ️ No active conversations found for barber ${normalizedJid}`);
+              return;
+            }
+            
+            // Process message for each user with active conversation
+            // In most cases, this will be just one user
+            for (const userId of activeUsers) {
+              console.log(`📨 Processing message from barber ${normalizedJid} for user ${userId}: "${text}"`);
               
               // Clear timeout since barber replied
-              TimeoutManager.clearTimeout(normalizedJid);
+              TimeoutManager.clearTimeout(normalizedJid, userId);
               
-              const response = await continueConversationWithBarber(normalizedJid, text);
-              console.log(`🤖 Agent response: "${response}"`);
+              const response = await continueConversationWithBarber(normalizedJid, text, userId);
+              console.log(`🤖 Agent response for user ${userId}: "${response}"`);
               
               // Send the agent's response with human-like behavior
               await sendHumanLike(normalizedJid, response);
@@ -79,7 +106,7 @@ export async function initWhatsApp(onQR: (qrImage: Buffer) => Promise<void>) {
               
               // Start new timeout if conversation is not completed
               if (!response.includes('[CONFIRMED:')) {
-                await TimeoutManager.startTimeout(normalizedJid);
+                await TimeoutManager.startTimeout(normalizedJid, userId);
               }
               
               // Send update to Telegram
@@ -88,18 +115,19 @@ export async function initWhatsApp(onQR: (qrImage: Buffer) => Promise<void>) {
                 const isConfirmed = response.includes('[CONFIRMED:');
                 
                 if (!isConfirmed) {
-                  // Send conversation update (only if not confirmed, as confirmation sends its own notification)
+                  // Get conversation context for this user
+                  const conversationContext = await getConversationContext(normalizedJid, userId);
                   const barberName = conversationContext?.barberName || 'Барбер';
                   const updateMessage = `💬 Обновление разговора с ${barberName}:\n\n📨 Барбер: "${text}"\n🤖 Ответ: "${response}"`;
-                  await sendTelegramNotification(updateMessage);
+                  await sendTelegramNotification(updateMessage, userId);
                 }
               } catch (error) {
                 console.error('Failed to send Telegram conversation update:', error);
               }
-              
-            } catch (error) {
-              console.error(`❌ Error handling message from ${normalizedJid}:`, error);
             }
+            
+          } catch (error) {
+            console.error(`❌ Error handling message from ${normalizedJid}:`, error);
           }
         }
       }
